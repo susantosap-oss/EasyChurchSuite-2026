@@ -1,0 +1,17 @@
+node_modules/
+.next/
+dist/
+.turbo/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+android/
+ios/
+out/
+data/KJV.json
+data/t_kjv.json

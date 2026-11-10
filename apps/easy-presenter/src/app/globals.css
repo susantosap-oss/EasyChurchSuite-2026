@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1e293b; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Range input */
+input[type='range'] { accent-color: #3b82f6; }
+
+/* ── Animated slide backgrounds ── */
+@keyframes gradientPulse {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes auroraGlow {
+  0%   { filter: hue-rotate(0deg)  brightness(0.9) saturate(1.0); }
+  100% { filter: hue-rotate(40deg) brightness(1.1) saturate(1.3); }
+}
+@keyframes firePulse {
+  0%   { filter: brightness(0.75) saturate(1.0); }
+  100% { filter: brightness(1.25) saturate(1.6); }
+}
+
+.slide-bg-gradient-pulse {
+  background: linear-gradient(-45deg, #0d1117, #1e0a3c, #0a1f3d, #0d1117);
+  background-size: 400% 400%;
+  animation: gradientPulse 10s ease infinite;
+}
+.slide-bg-aurora {
+  background:
+    radial-gradient(ellipse at 15% 40%, rgba(0,230,100,0.3)  0%, transparent 50%),
+    radial-gradient(ellipse at 85% 60%, rgba(0,100,255,0.3)  0%, transparent 50%),
+    radial-gradient(ellipse at 55% 20%, rgba(100,0,220,0.18) 0%, transparent 40%),
+    #030e14;
+  animation: auroraGlow 7s ease-in-out infinite alternate;
+}
+.slide-bg-worship {
+  background: linear-gradient(-45deg, #1a0800, #3d1200, #1a0800, #280e00);
+  background-size: 400% 400%;
+  animation: gradientPulse 8s ease infinite;
+}
+.slide-bg-fire {
+  background: radial-gradient(ellipse at 50% 100%, #ff4400 0%, #cc2200 25%, #330000 60%, #000 100%);
+  animation: firePulse 2.5s ease-in-out infinite alternate;
+}

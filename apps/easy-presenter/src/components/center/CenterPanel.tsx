@@ -49,6 +49,37 @@ export function CenterPanel({
   const isScripture = item.type === 'scripture'
   const activeSlide = item.slides.find(s => s.id === activeSlideId) ?? item.slides[0] ?? null
 
+  // Scripture monitor: auto-shrink font so text always fits without clipping
+  const monitorAreaRef = useRef<HTMLDivElement>(null)
+  const textRef        = useRef<HTMLParagraphElement>(null)
+  const [autoFontSize, setAutoFontSize] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isScripture) return
+    const id = setTimeout(() => {
+      const p    = textRef.current
+      const area = monitorAreaRef.current
+      if (!p || !area) return
+
+      p.style.fontSize = ''                       // reset to CSS clamp value
+      const availH = area.clientHeight - 80       // minus padding (py-6=48) + label (~32)
+
+      if (p.offsetHeight <= availH) { setAutoFontSize(null); return }
+
+      // Binary search: find largest font that fits
+      let lo = 12, hi = 64
+      while (lo < hi - 1) {
+        const mid = (lo + hi) >> 1
+        p.style.fontSize = `${mid}px`
+        if (p.offsetHeight <= availH) lo = mid
+        else hi = mid
+      }
+      p.style.fontSize = ''
+      setAutoFontSize(lo)
+    }, 40)
+    return () => clearTimeout(id)
+  }, [activeSlide?.text, isScripture])
+
   // Tap Tempo — hook always called (Rules of Hooks)
   const tempo = useTapTempo()
   const [beatsPerSlide, setBeatsPerSlide] = useState(4)
@@ -206,7 +237,7 @@ export function CenterPanel({
       {isScripture ? (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           {/* Monitor canvas — fills all available space */}
-          <div className="flex-1 relative overflow-hidden m-3 mb-2 rounded-2xl min-h-0"
+          <div ref={monitorAreaRef} className="flex-1 relative overflow-hidden m-3 mb-2 rounded-2xl min-h-0"
             style={{
               ...bgToCss(item.background),
               border:    isSongLive ? '2px solid #dc2626' : '2px solid #2a3347',
@@ -232,12 +263,12 @@ export function CenterPanel({
               }} />
             )}
 
-            {/* Verse text — centered, large */}
+            {/* Verse text — centered, auto-fit font */}
             <div className="absolute inset-0 flex flex-col items-center justify-center px-8 py-6"
               style={{ zIndex: 2 }}>
-              <p style={{
+              <p ref={textRef} style={{
                 fontFamily:       item.textStyle.fontFamily,
-                fontSize:         'clamp(22px, 3.8vw, 72px)',
+                fontSize:         autoFontSize != null ? `${autoFontSize}px` : 'clamp(22px, 3.8vw, 72px)',
                 fontWeight:       item.textStyle.fontWeight,
                 textAlign:        item.textStyle.textAlign,
                 color:            item.textStyle.color,

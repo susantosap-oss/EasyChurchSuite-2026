@@ -28,7 +28,7 @@ export function getPresenterDb(): DbInstance {
       `Run: pnpm db:seed-demo  to create the demo database.`
     )
   }
-  _db = new Database(dbPath, { readonly: true }) as unknown as DbInstance
+  _db = new Database(dbPath) as unknown as DbInstance
   ;(_db as unknown as Database.Database).pragma('journal_mode = WAL')
   ;(_db as unknown as Database.Database).pragma('foreign_keys = ON')
   ;(_db as unknown as Database.Database).pragma('cache_size = -16000')

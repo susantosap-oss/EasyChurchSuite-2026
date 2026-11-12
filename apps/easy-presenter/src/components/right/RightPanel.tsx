@@ -19,26 +19,34 @@ interface Props {
   activeItem: ServiceItem
   liveBackground: SlideBackground
   liveTextStyle: TextStyle
+  liveMediaUrl?: string
+  liveMediaType?: 'image' | 'video' | 'pdf'
   onUpdateBackground: (bg: SlideBackground) => void
   onUpdateTextStyle: (style: Partial<TextStyle>) => void
 }
 
 export function RightPanel(props: Props) {
   const [tab, setTab] = useState<BottomTab>('format')
-  const { activeItem, liveBackground, liveTextStyle, liveSlide, onUpdateBackground, onUpdateTextStyle, ...panelProps } = props
+  const {
+    activeItem, liveBackground, liveTextStyle, liveSlide,
+    liveMediaUrl, liveMediaType,
+    onUpdateBackground, onUpdateTextStyle,
+    ...panelProps
+  } = props
 
   return (
     <div
-      className="flex flex-col flex-shrink-0"
-      style={{ width: 308, borderLeft: '1px solid #2a3347', background: '#0f1117' }}
+      className="flex flex-col flex-shrink-0 overflow-hidden"
+      style={{ width: 300, height: '100%', borderLeft: '1px solid #2a3347', background: '#0f1117' }}
     >
-      {/* ── OUTPUT — always visible ── */}
+      {/* ── OUTPUT — top 50% ── */}
       <div
-        className="flex-shrink-0"
-        style={{ borderBottom: '1px solid #2a3347' }}
+        className="flex flex-col overflow-hidden"
+        style={{ flex: '0 0 50%', borderBottom: '1px solid #2a3347' }}
       >
+        {/* Header */}
         <div
-          className="px-3 py-1.5 flex items-center gap-2"
+          className="px-3 py-1 flex items-center gap-2 flex-shrink-0"
           style={{ background: '#161b27', borderBottom: '1px solid #2a3347' }}
         >
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Output</span>
@@ -48,16 +56,26 @@ export function RightPanel(props: Props) {
               ON AIR
             </span>
           )}
+          {liveMediaType && props.isLive && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: '#a855f722', color: '#a855f7' }}>
+              {liveMediaType === 'video' ? '🎬' : liveMediaType === 'pdf' ? '📄' : '🖼'}
+            </span>
+          )}
         </div>
-        <OutputPanel
-          {...panelProps}
-          liveSlide={liveSlide}
-          background={liveBackground}
-          textStyle={liveTextStyle}
-        />
+        {/* OutputPanel — scrollable within its half */}
+        <div className="flex-1 overflow-y-auto">
+          <OutputPanel
+            {...panelProps}
+            liveSlide={liveSlide}
+            background={liveBackground}
+            textStyle={liveTextStyle}
+            liveMediaUrl={liveMediaUrl}
+            liveMediaType={liveMediaType}
+          />
+        </div>
       </div>
 
-      {/* ── BOTTOM TABS: Format | Studio ── */}
+      {/* ── BOTTOM TABS: Format | Studio — bottom 50% ── */}
       <div className="flex flex-col flex-1 overflow-hidden">
         <div
           className="flex items-center px-3 h-8 gap-1 flex-shrink-0"

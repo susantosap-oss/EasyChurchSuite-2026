@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import type {
   SlideBackground, TextStyle,
   AnimatedBgType, VerticalPosition, TextAlignMode,
 } from '../types'
+import { FontPickerModal } from '../shared/FontPickerModal'
 
 const SOLID_PRESETS = [
   '#0a0f1a', '#000000', '#0f172a', '#1e0a3c', '#0a1a0a',
@@ -28,16 +30,6 @@ const ANIMATED_PRESETS: { id: AnimatedBgType; name: string }[] = [
   { id: 'fire',           name: 'Fire' },
 ]
 
-const FONTS = [
-  { label: 'Inter (Default)',  value: 'Inter, sans-serif' },
-  { label: 'Arial',            value: 'Arial, sans-serif' },
-  { label: 'Segoe UI',         value: "'Segoe UI', sans-serif" },
-  { label: 'Trebuchet MS',     value: "'Trebuchet MS', sans-serif" },
-  { label: 'Georgia',          value: 'Georgia, serif' },
-  { label: 'Times New Roman',  value: "'Times New Roman', serif" },
-  { label: 'Impact',           value: 'Impact, fantasy' },
-  { label: 'Courier New',      value: "'Courier New', monospace" },
-]
 
 const V_POSITIONS: { id: VerticalPosition; label: string }[] = [
   { id: 'top',    label: 'Paling Atas' },
@@ -68,6 +60,10 @@ function SL({ children }: { children: string }) {
 export function FormatPanel({ background, textStyle, onUpdateBackground, onUpdateTextStyle }: Props) {
   const bgType = background.type
   const hasEdgeOffset = ['top','upper','lower','bottom'].includes(textStyle.verticalPosition)
+  const [showFontPicker, setShowFontPicker] = useState(false)
+
+  // Extract clean display name from CSS font stack
+  const fontDisplayName = textStyle.fontFamily.replace(/,.*$/, '').replace(/['"]/g, '').trim()
 
   return (
     <div className="flex flex-col flex-1 overflow-y-auto" style={{ fontSize: 11 }}>
@@ -247,13 +243,28 @@ export function FormatPanel({ background, textStyle, onUpdateBackground, onUpdat
         {/* Font */}
         <div>
           <label className="block text-[10px] mb-1" style={{ color: '#475569' }}>Font</label>
-          <select value={textStyle.fontFamily}
-            onChange={e => onUpdateTextStyle({ fontFamily: e.target.value })}
-            className="w-full px-2 py-1.5 rounded-lg focus:outline-none"
-            style={{ background: '#1e2535', border: '1px solid #2a3347', color: '#e2e8f0', fontSize: 11 }}>
-            {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
+          <button
+            onClick={() => setShowFontPicker(true)}
+            className="w-full px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between gap-2"
+            style={{ background: '#1e2535', border: '1px solid #2a3347' }}
+          >
+            <span
+              className="truncate text-sm"
+              style={{ fontFamily: textStyle.fontFamily, color: '#e2e8f0' }}
+            >
+              {fontDisplayName}
+            </span>
+            <span className="text-[9px] flex-shrink-0" style={{ color: '#475569' }}>▼ Pilih</span>
+          </button>
         </div>
+
+        {showFontPicker && (
+          <FontPickerModal
+            currentFont={textStyle.fontFamily}
+            onSelect={f => onUpdateTextStyle({ fontFamily: f })}
+            onClose={() => setShowFontPicker(false)}
+          />
+        )}
 
         {/* Size + Bold + Color */}
         <div className="flex items-end gap-2">

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { BookInfo, VerseData, VersionInfo } from '@easychurch/bible-queries'
+import { ImportBibleModal } from './ImportBibleModal'
 
 export interface ScriptureAddPayload {
   title: string
@@ -19,6 +20,7 @@ type View = 'books' | 'chapters' | 'verses'
 export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
   const [view, setView]                   = useState<View>('books')
   const [version, setVersion]             = useState('TB')
+  const [showImport, setShowImport]       = useState(false)
   const [versions, setVersions]           = useState<VersionInfo[]>([])
   const [books, setBooks]                 = useState<BookInfo[]>([])
   const [q, setQ]                         = useState('')
@@ -30,6 +32,9 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
   const [totalChapters, setTotalChapters] = useState(0)
   const [loading, setLoading]             = useState(false)
   const [dbMissing, setDbMissing]         = useState(false)
+  const [selectedVerseIdx, setSelectedVerseIdx] = useState(0)
+  const verseListRef = useRef<HTMLDivElement>(null)
+  const verseRowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   // Fetch available versions once
   useEffect(() => {
@@ -71,6 +76,57 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, version, selectedBook?.number, selectedChapter])
+
+  // Reset selection when chapter changes or verses load
+  useEffect(() => {
+    setSelectedVerseIdx(0)
+    verseRowRefs.current = []
+  }, [view, selectedChapter, version])
+
+  // Keyboard navigation in verse view
+  useEffect(() => {
+    if (view !== 'verses' || !verses.length) return
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName ?? ''
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
+
+      const goLiveVerse = (idx: number) => {
+        const v = verses[idx]
+        if (!v) return
+        const abbr  = bookAbbr || (selectedBook?.nameAbbr ?? '')
+        const label = `${abbr} ${selectedChapter}:${v.verseNumber}`
+        onQuickLaunch(v.text, label)
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSelectedVerseIdx(i => {
+          const next = Math.min(i + 1, verses.length - 1)
+          verseRowRefs.current[next]?.scrollIntoView({ block: 'nearest' })
+          goLiveVerse(next)
+          return next
+        })
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSelectedVerseIdx(i => {
+          const prev = Math.max(i - 1, 0)
+          verseRowRefs.current[prev]?.scrollIntoView({ block: 'nearest' })
+          goLiveVerse(prev)
+          return prev
+        })
+      } else if (e.key === 'Enter' || (e.ctrlKey && e.key === 'l')) {
+        e.preventDefault()
+        const v = verses[selectedVerseIdx]
+        if (!v) return
+        const abbr  = bookAbbr || (selectedBook?.nameAbbr ?? '')
+        const label = `${abbr} ${selectedChapter}:${v.verseNumber}`
+        onQuickLaunch(v.text, label)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, verses, selectedVerseIdx, bookAbbr, selectedBook, selectedChapter, version])
 
   const addChapter = () => {
     if (!selectedBook || selectedChapter === null || !verses.length) return
@@ -124,24 +180,36 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
       <div className="flex flex-col h-full">
         {/* Search + version */}
         <div className="p-2 flex-shrink-0 space-y-1.5">
-          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg"
-            style={{ background: '#1e2535', border: '1px solid #2a3347' }}>
-            <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#475569' }}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input value={q} onChange={e => setQ(e.target.value)}
-              placeholder="Cari kitab..."
-              className="bg-transparent text-xs focus:outline-none w-full"
-              style={{ color: '#e2e8f0' }} />
-            {q && (
-              <button onClick={() => setQ('')}
-                className="text-slate-500 hover:text-slate-300 text-xs leading-none flex-shrink-0">×</button>
-            )}
+          <div className="flex gap-1.5">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg flex-1"
+              style={{ background: '#1e2535', border: '1px solid #2a3347' }}>
+              <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#475569' }}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input value={q} onChange={e => setQ(e.target.value)}
+                placeholder="Cari kitab..."
+                className="bg-transparent text-xs focus:outline-none w-full"
+                style={{ color: '#e2e8f0' }} />
+              {q && (
+                <button onClick={() => setQ('')}
+                  className="text-slate-500 hover:text-slate-300 text-xs leading-none flex-shrink-0">×</button>
+              )}
+            </div>
+            <button
+              onClick={() => setShowImport(true)}
+              className="px-2 py-1.5 rounded-lg text-[10px] font-semibold flex-shrink-0"
+              style={{ background: '#1e2535', color: '#3b82f6', border: '1px solid #2a3347' }}
+              title="Import database Alkitab"
+            >
+              ⬆ Import
+            </button>
           </div>
           {versionPills}
         </div>
+
+        {showImport && <ImportBibleModal onClose={() => setShowImport(false)} />}
 
         {/* Loading / empty state */}
         {loading && (
@@ -257,9 +325,14 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
               </button>
             )}
           </div>
+          {verses.length > 0 && (
+            <p className="text-[9px] mt-0.5" style={{ color: '#374151' }}>
+              ↑↓ = Live langsung · Enter / Ctrl+L = Live ayat ini
+            </p>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={verseListRef} className="flex-1 overflow-y-auto">
           {loading && (
             <div className="text-center py-4 text-[10px]" style={{ color: '#475569' }}>Memuat ayat...</div>
           )}
@@ -268,10 +341,13 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
               Ayat tidak ditemukan
             </div>
           )}
-          {!loading && verses.map(v => (
+          {!loading && verses.map((v, idx) => (
             <VerseRow
               key={v.id}
               verse={v}
+              selected={idx === selectedVerseIdx}
+              rowRef={el => { verseRowRefs.current[idx] = el }}
+              onSelect={() => setSelectedVerseIdx(idx)}
               onLive={() => onQuickLaunch(
                 v.text,
                 `${displayAbbr} ${selectedChapter}:${v.verseNumber}`
@@ -331,36 +407,45 @@ function ChapterButton({ chapter, onClick }: { chapter: number; onClick: () => v
   )
 }
 
-function VerseRow({ verse, onLive, onAdd }: {
-  verse: VerseData; onLive: () => void; onAdd: () => void
+function VerseRow({ verse, selected, rowRef, onSelect, onLive, onAdd }: {
+  verse: VerseData
+  selected: boolean
+  rowRef: (el: HTMLDivElement | null) => void
+  onSelect: () => void
+  onLive: () => void
+  onAdd: () => void
 }) {
   const [hover, setHover] = useState(false)
   return (
     <div
-      className="flex gap-2 px-2.5 py-2 transition-colors"
+      ref={rowRef}
+      className="flex gap-2 px-2.5 py-2 transition-colors cursor-pointer"
       style={{
-        background:  hover ? '#0d1520' : 'transparent',
+        background:   selected ? '#0d1a30' : hover ? '#0d1520' : 'transparent',
         borderBottom: '1px solid #1a2235',
+        borderLeft:   `2px solid ${selected ? '#3b82f6' : 'transparent'}`,
       }}
+      onClick={onSelect}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
       <span className="text-[10px] font-mono flex-shrink-0 mt-0.5"
-        style={{ color: '#374151', minWidth: 18, textAlign: 'right' }}>
+        style={{ color: selected ? '#93c5fd' : '#374151', minWidth: 18, textAlign: 'right' }}>
         {verse.verseNumber}
       </span>
-      <span className="text-xs flex-1 leading-relaxed" style={{ color: '#94a3b8' }}>
+      <span className="text-xs flex-1 leading-relaxed"
+        style={{ color: selected ? '#e2e8f0' : '#94a3b8' }}>
         {verse.text}
       </span>
-      {/* Action buttons — visible on hover */}
+      {/* Action buttons — visible on hover or selected */}
       <div className="flex flex-col gap-1 flex-shrink-0 transition-opacity"
-        style={{ opacity: hover ? 1 : 0 }}>
-        <button onClick={onLive}
+        style={{ opacity: hover || selected ? 1 : 0 }}>
+        <button onClick={e => { e.stopPropagation(); onLive() }}
           className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap"
           style={{ background: '#581c87', color: '#e9d5ff', border: '1px solid #7e22ce' }}>
           ▶ Live
         </button>
-        <button onClick={onAdd}
+        <button onClick={e => { e.stopPropagation(); onAdd() }}
           className="text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap"
           style={{ background: '#1e3a5f', color: '#93c5fd', border: '1px solid #1d4ed8' }}>
           + Ibadah

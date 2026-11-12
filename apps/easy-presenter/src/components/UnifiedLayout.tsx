@@ -10,6 +10,7 @@ import { SlideEditModal } from './center/SlideEditModal'
 import type { ServiceItem, SlideBackground, TextStyle, Slide } from './types'
 import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG } from './types'
 import type { ScriptureAddPayload } from './left/ScriptureSearch'
+import type { MediaFile } from './left/MediaLibrary'
 
 const DEMO_ITEMS: Omit<ServiceItem, 'background' | 'textStyle'>[] = [
   { id: '1', type: 'song', title: 'Besar Kuasa-Mu', subtitle: 'Paul Baloche', slides: [
@@ -52,7 +53,6 @@ function makeItems(): ServiceItem[] {
   }))
 }
 
-// Temporary "quick live" slide (Bible lookup or external)
 interface QuickSlide { text: string; label: string }
 
 export function UnifiedLayout() {
@@ -61,6 +61,7 @@ export function UnifiedLayout() {
   const [activeSlideId, setActiveSlideId] = useState('s1')
   const [liveSlideId, setLiveSlideId]     = useState<string | null>(null)
   const [isBlank, setIsBlank]             = useState(false)
+  const [isClearText, setIsClearText]     = useState(false)
   const [isLive, setIsLive]               = useState(false)
   const [quickSlide, setQuickSlide]       = useState<QuickSlide | null>(null)
   const [editSlideId, setEditSlideId]     = useState<string | null>(null)
@@ -70,10 +71,10 @@ export function UnifiedLayout() {
   const liveSlide   = items.flatMap(i => i.slides).find(s => s.id === liveSlideId) ?? null
   const liveItem    = items.find(i => i.slides.some(s => s.id === liveSlideId)) ?? null
 
-  // Effective background + textStyle for the live output
+  const baseLiveSlide = isLive && !isBlank ? (liveSlide ?? activeSlide) : null
   const effectiveLiveSlide: Slide | null = quickSlide
     ? { id: '__quick__', label: quickSlide.label, text: quickSlide.text }
-    : (isLive && !isBlank ? (liveSlide ?? activeSlide) : null)
+    : (isClearText && baseLiveSlide ? { ...baseLiveSlide, text: '' } : baseLiveSlide)
 
   const liveBackground: SlideBackground = (() => {
     if (quickSlide) return DEFAULT_SCRIPTURE_BG
@@ -87,6 +88,13 @@ export function UnifiedLayout() {
     if (ls?.textStyleOverride) return { ...(liveItem?.textStyle ?? activeItem.textStyle), ...ls.textStyleOverride }
     return liveItem?.textStyle ?? activeItem.textStyle
   })()
+
+  // Media props for output panel
+  const liveMediaUrl = isLive && !isBlank && !quickSlide && liveItem?.type === 'media'
+    ? liveItem.mediaUrl : undefined
+  const liveMediaType = isLive && !isBlank && !quickSlide && liveItem?.type === 'media'
+    ? (liveItem.mediaType === 'ppt' ? undefined : liveItem.mediaType) as 'image' | 'video' | 'pdf' | undefined
+    : undefined
 
   // ── Handlers ──
 
@@ -102,7 +110,8 @@ export function UnifiedLayout() {
     }
   }
 
-  const handleBlank = () => setIsBlank(v => !v)
+  const handleBlank     = () => { setIsBlank(v => !v); setIsClearText(false) }
+  const handleClearText = () => setIsClearText(v => !v)
 
   const handleNext = () => {
     setQuickSlide(null)
@@ -134,11 +143,19 @@ export function UnifiedLayout() {
     }
   }
 
+  // Single click: hanya pilih untuk preview / edit
   const handleSelectSlide = (id: string) => {
+    setActiveSlideId(id)
+    setQuickSlide(null)
+  }
+
+  // Double click atau auto-advance tap tempo: langsung Go Live
+  const handleGoLiveSlide = (id: string) => {
     setActiveSlideId(id)
     setLiveSlideId(id)
     setIsLive(true)
     setIsBlank(false)
+    setIsClearText(false)
     setQuickSlide(null)
   }
 
@@ -156,7 +173,6 @@ export function UnifiedLayout() {
       slides: item.slides.map(s => s.id === slideId ? { ...s, ...updates } : s),
     })))
 
-  // Add a Bible passage from the library as a new service item
   const handleAddScripture = ({ title, subtitle, slides }: ScriptureAddPayload) => {
     const newId = `sc_${Date.now()}`
     const newItem: ServiceItem = {
@@ -177,14 +193,56 @@ export function UnifiedLayout() {
     setActiveSlideId(newItem.slides[0]!.id)
   }
 
-  // Quick launch from search (Bible verse or any text)
+  const handleAddSong = (item: ServiceItem) => {
+    setItems(prev => [...prev, item])
+    setActiveItemId(item.id)
+    setActiveSlideId(item.slides[0]!.id)
+  }
+
+  const handleAddMedia = (file: MediaFile) => {
+    const newId = `media_${Date.now()}`
+    const newItem: ServiceItem = {
+      id: newId,
+      type: 'media',
+      title: file.name,
+      subtitle: file.mediaType === 'video' ? 'Video' : file.mediaType === 'ppt' ? 'PowerPoint' : 'Gambar',
+      slides: [{ id: `${newId}_s0`, label: file.name, text: '' }],
+      background: { type: 'solid', color: '#000000' },
+      textStyle: { ...DEFAULT_TEXT_STYLE },
+      mediaUrl: file.url,
+      mediaType: file.mediaType,
+    }
+    setItems(prev => [...prev, newItem])
+    setActiveItemId(newId)
+    setActiveSlideId(newItem.slides[0]!.id)
+  }
+
   const handleQuickLaunch = (text: string, label: string) => {
+    // Keep quickSlide for output styling (DEFAULT_SCRIPTURE_BG + DEFAULT_TEXT_STYLE)
     setQuickSlide({ text, label })
     setIsLive(true)
     setIsBlank(false)
+    // Also show in CenterPanel (monitor view): add/replace a single reusable Quick item
+    const qSlide = { id: '__qs__', label, text }
+    const qItem: ServiceItem = {
+      id: '__quick__',
+      type: 'scripture',
+      title: label,
+      subtitle: 'Quick',
+      slides: [qSlide],
+      background: { ...DEFAULT_SCRIPTURE_BG },
+      textStyle: { ...DEFAULT_TEXT_STYLE },
+    }
+    setItems(prev => {
+      const idx = prev.findIndex(i => i.id === '__quick__')
+      if (idx >= 0) { const n = [...prev]; n[idx] = qItem; return n }
+      return [...prev, qItem]
+    })
+    setActiveItemId('__quick__')
+    setActiveSlideId('__qs__')
+    setLiveSlideId('__qs__')
   }
 
-  // Switch to service item from search
   const handleGotoItem = (itemId: string) => {
     const item = items.find(i => i.id === itemId)
     if (!item) return
@@ -196,7 +254,39 @@ export function UnifiedLayout() {
     setQuickSlide(null)
   }
 
-  // Slide being edited
+  const handleDeleteItem = (id: string) => {
+    setItems(prev => {
+      if (prev.length <= 1 && id !== '__quick__') return prev
+      const newItems = prev.filter(i => i.id !== id)
+      if (id === activeItemId) {
+        const idx = prev.findIndex(i => i.id === id)
+        const next = newItems[Math.min(idx, newItems.length - 1)]!
+        setActiveItemId(next.id)
+        setActiveSlideId(next.slides[0]!.id)
+      }
+      if (id === liveItem?.id) {
+        setIsLive(false)
+        setLiveSlideId(null)
+      }
+      return newItems
+    })
+  }
+
+  const handleLoadScene = (loadedItems: ServiceItem[]) => {
+    if (!loadedItems.length) return
+    setItems(loadedItems.filter(i => i.id !== '__quick__').map(item => ({
+      ...item,
+      background: item.background ?? (item.type === 'song' ? DEFAULT_SONG_BG : DEFAULT_SCRIPTURE_BG),
+      textStyle: item.textStyle ?? DEFAULT_TEXT_STYLE,
+    })))
+    const first = loadedItems[0]!
+    setActiveItemId(first.id)
+    setActiveSlideId(first.slides[0]?.id ?? '')
+    setLiveSlideId(null)
+    setIsLive(false)
+    setQuickSlide(null)
+  }
+
   const editingSlide = editSlideId
     ? items.flatMap(i => i.slides).find(s => s.id === editSlideId) ?? null
     : null
@@ -226,16 +316,25 @@ export function UnifiedLayout() {
             const item = items.find(i => i.id === id)
             if (item) setActiveSlideId(item.slides[0]!.id)
           }}
+          onDeleteItem={handleDeleteItem}
           onAddScripture={handleAddScripture}
+          onAddSong={handleAddSong}
+          onAddMedia={handleAddMedia}
           onQuickLaunch={handleQuickLaunch}
+          onLoadScene={handleLoadScene}
         />
 
         <CenterPanel
           item={activeItem}
           activeSlideId={activeSlideId}
           liveSlideId={liveSlideId}
+          isLive={isLive}
           onSelectSlide={handleSelectSlide}
+          onGoLiveSlide={handleGoLiveSlide}
+          onClearLive={handleClearText}
+          isClearLive={isClearText}
           onEditSlide={setEditSlideId}
+          onUpdateSlide={updateSlide}
         />
 
         <RightPanel
@@ -249,6 +348,8 @@ export function UnifiedLayout() {
           activeItem={activeItem}
           liveBackground={liveBackground}
           liveTextStyle={liveTextStyle}
+          liveMediaUrl={liveMediaUrl}
+          liveMediaType={liveMediaType}
           onUpdateBackground={updateBackground}
           onUpdateTextStyle={updateTextStyle}
         />
@@ -261,7 +362,6 @@ export function UnifiedLayout() {
         isLive={isLive}
       />
 
-      {/* Edit slide modal */}
       {editingSlide && (
         <SlideEditModal
           slide={editingSlide}

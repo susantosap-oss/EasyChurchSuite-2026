@@ -14,9 +14,10 @@ interface Props {
   activeItemId: string
   liveItemId: string | null
   onSelect: (id: string) => void
+  onDelete: (id: string) => void
 }
 
-export function SchedulePanel({ service, activeItemId, liveItemId, onSelect }: Props) {
+export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onDelete }: Props) {
   return (
     <div className="flex-1 overflow-y-auto py-1.5 px-1.5 space-y-0.5">
       {service.map((item, idx) => {
@@ -25,17 +26,26 @@ export function SchedulePanel({ service, activeItemId, liveItemId, onSelect }: P
         const isLive   = item.id === liveItemId
 
         return (
-          <button
+          <div
             key={item.id}
-            onClick={() => onSelect(item.id)}
-            className="w-full text-left rounded-lg transition-all group"
+            className="rounded-lg transition-all group relative"
             style={{
-              background:   isActive ? '#1e2535' : 'transparent',
-              border:       `1px solid ${isActive ? '#2a3347' : 'transparent'}`,
-              padding:      '7px 10px',
+              background: isActive ? '#1e2535' : 'transparent',
+              border:     `1px solid ${isActive ? '#2a3347' : 'transparent'}`,
+            }}
+            onMouseEnter={e => {
+              if (!isActive) e.currentTarget.style.background = '#161b27'
+            }}
+            onMouseLeave={e => {
+              if (!isActive) e.currentTarget.style.background = 'transparent'
             }}
           >
-            <div className="flex items-center gap-2.5">
+            {/* Main clickable row */}
+            <div
+              className="flex items-center gap-2.5 cursor-pointer"
+              style={{ padding: '7px 10px' }}
+              onClick={() => onSelect(item.id)}
+            >
               {/* Order number */}
               <span
                 className="text-[10px] font-mono flex-shrink-0 w-4 text-right"
@@ -76,8 +86,20 @@ export function SchedulePanel({ service, activeItemId, liveItemId, onSelect }: P
                   LIVE
                 </span>
               )}
+
+              {/* Delete button — visible on hover, hidden when live */}
+              {!isLive && (
+                <button
+                  onClick={e => { e.stopPropagation(); onDelete(item.id) }}
+                  title="Hapus dari urutan ibadah"
+                  className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: '#3b1515', color: '#f87171', fontSize: 11 }}
+                >
+                  ×
+                </button>
+              )}
             </div>
-          </button>
+          </div>
         )
       })}
     </div>

@@ -1,4 +1,5 @@
 export type ItemType = 'song' | 'scripture' | 'announcement' | 'media'
+export type MediaType = 'image' | 'video' | 'ppt' | 'pdf'
 export type AnimatedBgType = 'gradient-pulse' | 'aurora' | 'worship' | 'fire' | 'custom'
 export type VerticalPosition = 'top' | 'upper' | 'center' | 'lower' | 'bottom'
 export type TextAlignMode = 'left' | 'center' | 'right'
@@ -60,6 +61,7 @@ export interface Slide {
   note?: string
   backgroundOverride?: SlideBackground
   textStyleOverride?: Partial<TextStyle>
+  jedaBars?: number  // pause N bars before auto-advancing to next slide
 }
 
 export interface ServiceItem {
@@ -70,4 +72,6 @@ export interface ServiceItem {
   slides: Slide[]
   background: SlideBackground
   textStyle: TextStyle
+  mediaUrl?: string
+  mediaType?: MediaType
 }

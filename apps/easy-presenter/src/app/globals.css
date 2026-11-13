@@ -63,3 +63,49 @@ input[type='range'] { accent-color: #3b82f6; }
   background: radial-gradient(ellipse at 50% 100%, #ff4400 0%, #cc2200 25%, #330000 60%, #000 100%);
   animation: firePulse 2.5s ease-in-out infinite alternate;
 }
+
+/* ── Text animations (AnimatedText) ── */
+/* Entrance — distances in em so they scale with the font size */
+@keyframes ec-in-fade       { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ec-in-zoom-in    { from { opacity: 0; transform: scale(0.3) } to { opacity: 1; transform: none } }
+@keyframes ec-in-zoom-out   { from { opacity: 0; transform: scale(1.8) } to { opacity: 1; transform: none } }
+@keyframes ec-in-slide-up   { from { opacity: 0; transform: translateY(0.8em) } to { opacity: 1; transform: none } }
+@keyframes ec-in-slide-down { from { opacity: 0; transform: translateY(-0.8em) } to { opacity: 1; transform: none } }
+@keyframes ec-in-blur       { from { opacity: 0; filter: blur(0.35em) } to { opacity: 1; filter: none } }
+@keyframes ec-in-bounce {
+  0%   { opacity: 0; transform: translateY(-1.2em) }
+  55%  { opacity: 1; transform: translateY(0.18em) }
+  75%  { transform: translateY(-0.08em) }
+  100% { opacity: 1; transform: none }
+}
+@keyframes ec-in-pop {
+  0%   { opacity: 0; transform: scale(0) }
+  65%  { opacity: 1; transform: scale(1.18) }
+  100% { opacity: 1; transform: none }
+}
+@keyframes ec-in-flip { from { opacity: 0; transform: perspective(400px) rotateX(90deg) } to { opacity: 1; transform: none } }
+@keyframes ec-in-type { from { opacity: 0 } to { opacity: 1 } }
+
+/* Loop */
+@keyframes ec-loop-pulse   { 0%, 100% { transform: scale(1) } 50% { transform: scale(1.07) } }
+@keyframes ec-loop-float   { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-0.15em) } }
+@keyframes ec-loop-bounce  {
+  0%, 60%, 100% { transform: translateY(0) }
+  25% { transform: translateY(-0.3em) }
+  40% { transform: translateY(0.04em) }
+}
+@keyframes ec-loop-breathe { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
+@keyframes ec-loop-glow {
+  0%, 100% { text-shadow: 0 0 0.1em var(--ec-glow), 0 0 0.25em var(--ec-glow) }
+  50%      { text-shadow: 0 0 0.2em var(--ec-glow), 0 0 0.6em var(--ec-glow), 0 0 1.2em var(--ec-glow) }
+}
+@keyframes ec-loop-neon {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 0.05em #fff, 0 0 0.15em var(--ec-glow), 0 0 0.4em var(--ec-glow), 0 0 0.8em var(--ec-glow), 0 0 1.4em var(--ec-glow);
+  }
+  20%, 24%, 55% { opacity: 0.6; text-shadow: none }
+}
+
+/* ── Thumbnails: no motion (animated backgrounds / text effects) — keeps low-end GPUs free for the output ── */
+.ec-static, .ec-static * { animation: none !important; transition: none !important; }

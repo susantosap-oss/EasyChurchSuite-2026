@@ -1,7 +1,8 @@
 'use client'
 
 import { SlideCanvas } from '../shared/SlideCanvas'
-import type { Slide, SlideBackground, TextStyle } from '../types'
+import type { Slide, SlideBackground, TextStyle, MediaControl, MediaStatus } from '../types'
+import { OutputVideo } from './OutputVideo'
 
 interface Props {
   liveSlide: Slide | null
@@ -11,6 +12,8 @@ interface Props {
   textStyle: TextStyle
   liveMediaUrl?: string
   liveMediaType?: 'image' | 'video' | 'pdf'
+  mediaControl: MediaControl
+  onMediaStatus: (status: MediaStatus) => void
   onNext: () => void
   onPrev: () => void
   onBlank: () => void
@@ -19,7 +22,7 @@ interface Props {
 
 export function OutputPanel({
   liveSlide, isBlank, isLive, background, textStyle,
-  liveMediaUrl, liveMediaType,
+  liveMediaUrl, liveMediaType, mediaControl, onMediaStatus,
   onNext, onPrev, onBlank, onGoLive,
 }: Props) {
   const showMedia = isLive && !isBlank && liveMediaUrl && liveMediaType
@@ -46,13 +49,7 @@ export function OutputPanel({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={liveMediaUrl} alt="" className="w-full h-full object-contain" style={{ background: '#000' }} />
             ) : showMedia && liveMediaType === 'video' ? (
-              <video
-                src={liveMediaUrl}
-                className="w-full h-full object-contain"
-                style={{ background: '#000' }}
-                autoPlay
-                muted={false}
-              />
+              <OutputVideo url={liveMediaUrl} control={mediaControl} onStatus={onMediaStatus} />
             ) : showMedia && liveMediaType === 'pdf' ? (
               <iframe
                 src={liveMediaUrl}
@@ -66,6 +63,8 @@ export function OutputPanel({
                 background={background}
                 textStyle={textStyle}
                 containerWidth={260}
+                animate
+                image={liveSlide.image}
               />
             ) : (
               <div className="w-full h-full bg-black flex items-center justify-center">

@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS songs (
   time_signature TEXT DEFAULT '4/4',
   tempo        INTEGER,                    -- BPM
   tags         TEXT,                       -- JSON array
+  settings     TEXT,                       -- JSON presenter defaults (background, text style, animations, bg playlist)
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );

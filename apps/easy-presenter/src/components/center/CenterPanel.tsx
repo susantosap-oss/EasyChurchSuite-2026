@@ -1,8 +1,16 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import type { ServiceItem, SlideBackground } from '../types'
+import type { ServiceItem, TextStyle, TextAnimation, MediaControl, MediaStatus } from '../types'
+import { pickedBackground, songIdOf } from '../types'
 import { SlideGrid } from './SlideGrid'
+import { SlideCanvas } from '../shared/SlideCanvas'
+import {
+  BackgroundPlaylistPanel, BackgroundLibraryPanel, PanelHeader, playlistInsert, playlistStep, type BgLibrary,
+} from './BackgroundPanels'
+import { saveSongSettings } from '../shared/songSettings'
+import { TextAnimationPanel } from './TextAnimationPanel'
+import { MediaRemote } from './MediaRemote'
 import { TapTempoPanel } from './TapTempoPanel'
 import { useTapTempo } from '../../hooks/useTapTempo'
 
@@ -17,14 +25,13 @@ interface Props {
   isClearLive: boolean                  // current clear-text state
   onEditSlide: (slideId: string) => void
   onUpdateSlide: (slideId: string, updates: Partial<ServiceItem['slides'][0]>) => void
-}
-
-function bgToCss(bg: SlideBackground): React.CSSProperties {
-  switch (bg.type) {
-    case 'solid':    return { background: bg.color ?? '#0a0f1a' }
-    case 'gradient': return { background: bg.gradient ?? 'linear-gradient(135deg,#0f172a,#1e1b4b)' }
-    default:         return { background: '#0a0f1a' }
-  }
+  bgLibrary: BgLibrary
+  onUpdateItem: (patch: Partial<ServiceItem>) => void   // applies to this item
+  onUpdateTextStyle: (style: Partial<TextStyle>) => void
+  onUpdateGroupAnimation: (group: string, anim: TextAnimation | null) => void
+  mediaControl: MediaControl
+  mediaStatus: MediaStatus
+  onMediaControl: (patch: Partial<MediaControl>) => void
 }
 
 const TYPE_BADGE: Record<string, { label: string; color: string }> = {
@@ -36,13 +43,15 @@ const TYPE_BADGE: Record<string, { label: string; color: string }> = {
 
 export function CenterPanel({
   item, activeSlideId, liveSlideId, isLive,
-  onSelectSlide, onGoLiveSlide, onClearLive, isClearLive, onEditSlide, onUpdateSlide,
+  onSelectSlide, onGoLiveSlide, onClearLive, isClearLive, onEditSlide, onUpdateSlide, bgLibrary, onUpdateItem, onUpdateTextStyle, onUpdateGroupAnimation,
+  mediaControl, mediaStatus, onMediaControl,
 }: Props) {
   const badge        = TYPE_BADGE[item.type] ?? TYPE_BADGE.announcement!
   const hasOverrides = item.slides.some(s => s.backgroundOverride || s.textStyleOverride)
-  const isMedia      = item.type === 'media'
+  // Presentation decks (PDF pages) behave like normal slides, not a media player
+  const isDeck       = item.type === 'media' && item.mediaType === 'slides'
+  const isMedia      = item.type === 'media' && !isDeck
   const isSong       = item.type === 'song'
-  const videoRef     = useRef<HTMLVideoElement>(null)
 
   // Whether THIS item is currently on live output
   const isSongLive  = isLive && item.slides.some(s => s.id === liveSlideId)
@@ -80,24 +89,36 @@ export function CenterPanel({
     return () => clearTimeout(id)
   }, [activeSlide?.text, isScripture])
 
-  // Tap Tempo — hook always called (Rules of Hooks)
+  const [songSave, setSongSave] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const canSaveSong = isSong && !!songIdOf(item)
+
+  useEffect(() => { setSongSave('idle') }, [item.id])
+
+  const handleSaveSong = async () => {
+    setSongSave('saving')
+    try {
+      await saveSongSettings(item)
+      setSongSave('saved')
+      setTimeout(() => setSongSave(cur => (cur === 'saved' ? 'idle' : cur)), 2500)
+    } catch {
+      setSongSave('error')
+    }
+  }
+
+  // Background Playlist | Tap Tempo tab (songs). Tempo hook always runs (Rules of Hooks)
+  const [bgTab, setBgTab] = useState<'playlist' | 'tempo'>('playlist')
   const tempo = useTapTempo()
   const [beatsPerSlide, setBeatsPerSlide] = useState(4)
-  const [numpadDisplay, setNumpadDisplay] = useState('')
-  const numpadBufferRef = useRef('')
-  const numpadTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Reset tempo when switching to a non-song item
+  // Stop the tempo when leaving songs
   useEffect(() => {
     if (!isSong && tempo.isRunning) tempo.reset()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSong])
 
-  useEffect(() => {
-    if (isMedia && item.mediaType === 'video' && videoRef.current) {
-      videoRef.current.load()
-    }
-  }, [isMedia, item.mediaUrl, item.mediaType])
+  const [numpadDisplay, setNumpadDisplay] = useState('')
+  const numpadBufferRef = useRef('')
+  const numpadTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Clear numpad buffer when item changes
   useEffect(() => {
@@ -121,6 +142,13 @@ export function CenterPanel({
       }
 
       if (e.ctrlKey || e.altKey || e.metaKey) return
+
+      // Shift + ArrowLeft / ArrowRight — prev / next background in playlist
+      if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault()
+        onUpdateItem({ activeBgId: playlistStep(item.bgPlaylist ?? [], item.activeBgId, e.key === 'ArrowLeft' ? -1 : 1) })
+        return
+      }
 
       // ArrowLeft / ArrowRight — prev / next slide
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -155,7 +183,7 @@ export function CenterPanel({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMedia, isSong, activeSlideId, isSongLive, item.slides, onGoLiveSlide, onSelectSlide, onClearLive])
+  }, [isMedia, isSong, isScripture, activeSlideId, isSongLive, item.slides, onGoLiveSlide, onSelectSlide, onClearLive, item.bgPlaylist, item.activeBgId, onUpdateItem])
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden min-w-0" style={{ background: '#0f1117' }}>
@@ -171,6 +199,21 @@ export function CenterPanel({
           <span className="text-xs flex-shrink-0" style={{ color: '#475569' }}>— {item.subtitle}</span>
         )}
         <div className="flex-1" />
+        {isSong && (
+          <button
+            onClick={handleSaveSong}
+            disabled={!canSaveSong || songSave === 'saving'}
+            title={canSaveSong
+              ? 'Simpan background, playlist & animasi sebagai default lagu ini di database'
+              : 'Lagu demo — tambahkan lagu dari Pustaka agar bisa disimpan'}
+            className="text-xs px-2.5 py-1 rounded flex-shrink-0 transition-colors"
+            style={{
+              background: songSave === 'saved' ? '#14532d' : songSave === 'error' ? '#3b1515' : '#1e2535',
+              color:      !canSaveSong ? '#475569' : songSave === 'saved' ? '#86efac' : songSave === 'error' ? '#fca5a5' : '#ffffff',
+              border:     '1px solid #2a3347',
+            }}
+          >{songSave === 'saving' ? 'Menyimpan…' : songSave === 'saved' ? '✓ Tersimpan' : songSave === 'error' ? '✕ Gagal simpan' : '💾 Simpan ke Lagu'}</button>
+        )}
         {hasOverrides && (
           <span className="text-[9px] px-1.5 py-0.5 rounded flex-shrink-0"
             style={{ background: '#f59e0b22', color: '#f59e0b' }}>
@@ -217,14 +260,7 @@ export function CenterPanel({
           >▶ Live  <span style={{ opacity: 0.5, fontSize: 9 }}>Ctrl+L</span></button>
         )}
 
-        {!isMedia && !isSong && !tempo.isRunning && (
-          <button
-            onClick={() => onEditSlide(activeSlideId)}
-            className="text-xs px-2.5 py-1 rounded flex-shrink-0 transition-colors"
-            style={{ background: '#1e2535', color: '#3b82f6', border: '1px solid #2a3347' }}
-          >Edit</button>
-        )}
-        {isSong && !tempo.isRunning && (
+        {!isMedia && (
           <button
             onClick={() => onEditSlide(activeSlideId)}
             className="text-xs px-2.5 py-1 rounded flex-shrink-0 transition-colors"
@@ -236,32 +272,23 @@ export function CenterPanel({
       {/* ── SCRIPTURE FULL-PANEL MONITOR VIEW ── */}
       {isScripture ? (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="flex flex-col overflow-hidden min-h-0" style={{ flex: '50 1 0' }}>
           {/* Monitor canvas — fills all available space */}
-          <div ref={monitorAreaRef} className="flex-1 relative overflow-hidden m-3 mb-2 rounded-2xl min-h-0"
+          <div ref={monitorAreaRef} className="flex-1 relative overflow-hidden m-3 mb-2 rounded-2xl min-h-0 cursor-pointer"
+            onDoubleClick={() => onGoLiveSlide(activeSlideId)}
+            title="Klik 2× untuk Go Live"
             style={{
-              ...bgToCss(item.background),
+              background: '#0a0f1a',
               border:    isSongLive ? '2px solid #dc2626' : '2px solid #2a3347',
               boxShadow: isSongLive ? '0 0 28px rgba(220,38,38,0.3)' : 'none',
             }}
           >
-            {/* Image background */}
-            {item.background.type === 'image' && item.background.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={item.background.imageUrl} alt=""
-                className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 0 }} />
-            )}
-            {/* Video background */}
-            {item.background.type === 'video' && item.background.videoUrl && (
-              <video src={item.background.videoUrl} autoPlay loop muted playsInline
-                className="absolute inset-0 w-full h-full object-cover" style={{ zIndex: 0 }} />
-            )}
-            {/* Overlay for image/video */}
-            {(item.background.type === 'image' || item.background.type === 'video') && (
-              <div className="absolute inset-0" style={{
-                zIndex: 1,
-                background: `rgba(0,0,0,${item.background.imageOverlayOpacity ?? 0.4})`,
-              }} />
-            )}
+            {/* Background layer — same renderer as output (solid/gradient/image/video/animated) */}
+            <div className="absolute inset-0" style={{ zIndex: 0 }}>
+              <SlideCanvas text=""
+                background={pickedBackground(item) ?? activeSlide?.backgroundOverride ?? item.background}
+                textStyle={item.textStyle} />
+            </div>
 
             {/* Verse text — centered, auto-fit font */}
             <div className="absolute inset-0 flex flex-col items-center justify-center px-8 py-6"
@@ -270,6 +297,7 @@ export function CenterPanel({
                 fontFamily:       item.textStyle.fontFamily,
                 fontSize:         autoFontSize != null ? `${autoFontSize}px` : 'clamp(22px, 3.8vw, 72px)',
                 fontWeight:       item.textStyle.fontWeight,
+                fontStyle:        item.textStyle.fontStyle ?? 'normal',
                 textAlign:        item.textStyle.textAlign,
                 color:            item.textStyle.color,
                 lineHeight:       item.textStyle.lineHeight,
@@ -313,7 +341,7 @@ export function CenterPanel({
             >
               <span className="w-1.5 h-1.5 rounded-full"
                 style={{ background: isSongLive ? '#86efac' : '#93c5fd' }} />
-              {isSongLive ? 'Sudah Live — klik ayat lain untuk ganti' : '▶ Go Live — tampilkan ke output'}
+              {isSongLive ? 'Sudah Live — klik ayat lain untuk ganti' : '▶ Go Live — tampilkan ke output (atau klik 2× layar)'}
             </button>
 
             {/* Verse selector (multiple slides) */}
@@ -323,6 +351,8 @@ export function CenterPanel({
                   <div
                     key={s.id}
                     onClick={() => { if (isSongLive) onGoLiveSlide(s.id); else onSelectSlide(s.id) }}
+                    onDoubleClick={() => onGoLiveSlide(s.id)}
+                    title="Klik 2× untuk Go Live"
                     className="flex-shrink-0 px-3 py-1.5 rounded-lg cursor-pointer"
                     style={{
                       background: s.id === activeSlideId ? '#1e3a5f' : '#1e2535',
@@ -340,6 +370,20 @@ export function CenterPanel({
           </div>
         </div>
 
+          {/* ── BACKGROUND PLAYLIST + LIBRARY — same as songs ── */}
+          <BackgroundPlaylistPanel
+            playlist={item.bgPlaylist ?? []}
+            activeBgId={item.activeBgId}
+            isLive={isSongLive}
+            onUpdate={onUpdateItem}
+            onUploadFiles={bgLibrary.addUploads}
+          />
+          <BackgroundLibraryPanel
+            lib={bgLibrary}
+            onAddToPlaylist={entry => onUpdateItem({ bgPlaylist: playlistInsert(item.bgPlaylist ?? [], entry) })}
+          />
+        </div>
+
       ) : isMedia ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 overflow-hidden">
           {item.mediaType === 'ppt' && (
@@ -349,9 +393,9 @@ export function CenterPanel({
               <div className="px-4 py-3 rounded-xl text-xs text-left"
                 style={{ background: '#1a2235', border: '1px solid #2a3347', color: '#94a3b8', maxWidth: 360 }}>
                 <p className="font-semibold mb-1" style={{ color: '#f59e0b' }}>PowerPoint</p>
-                <p>File PPT/PPTX perlu dikonversi ke gambar agar dapat ditampilkan langsung.</p>
+                <p>File PPT/PPTX belum bisa ditampilkan langsung.</p>
                 <p className="mt-1" style={{ color: '#475569' }}>
-                  Gunakan Export → Gambar di PowerPoint, lalu import gambarnya satu per satu.
+                  Di PowerPoint: File → Save As → PDF, lalu import PDF-nya di tab Media — tiap halaman otomatis jadi slide.
                 </p>
               </div>
               <button
@@ -378,15 +422,18 @@ export function CenterPanel({
 
           {item.mediaType === 'video' && item.mediaUrl && (
             <div className="relative w-full h-full flex flex-col items-center justify-center gap-3">
-              <video ref={videoRef} src={item.mediaUrl} controls
-                className="max-w-full rounded-xl"
-                style={{ maxHeight: 'calc(100% - 56px)' }}
-                onPlay={() => onGoLiveSlide(item.slides[0]?.id ?? '')} />
-              <button
-                onClick={() => onGoLiveSlide(item.slides[0]?.id ?? '')}
-                className="px-4 py-2 rounded-lg text-xs font-semibold flex-shrink-0"
-                style={{ background: '#a855f7', color: 'white' }}
-              >▶ Go Live — ke Output</button>
+              <MediaRemote
+                key={item.mediaUrl}
+                url={item.mediaUrl}
+                isLive={isSongLive}
+                control={mediaControl}
+                status={mediaStatus}
+                onControl={onMediaControl}
+                onGoLive={time => {
+                  onGoLiveSlide(item.slides[0]?.id ?? '')
+                  onMediaControl({ playing: true, seek: { url: item.mediaUrl!, time, nonce: Date.now() } })
+                }}
+              />
             </div>
           )}
 
@@ -415,8 +462,8 @@ export function CenterPanel({
         </div>
       ) : (
         <>
-          {/* ── SLIDE GRID — always visible ── */}
-          <div className="flex-1 overflow-hidden min-h-0">
+          {/* ── SLIDE GRID — 50 (presentation decks: full height) ── */}
+          <div className="overflow-hidden min-h-0" style={{ flex: '50 1 0' }}>
             <SlideGrid
               slides={item.slides}
               activeSlideId={activeSlideId}
@@ -425,33 +472,96 @@ export function CenterPanel({
               textStyle={item.textStyle}
               onSelect={onSelectSlide}
               onGoLive={onGoLiveSlide}
-              onUpdateSlide={onUpdateSlide}
+              isItemLive={isSongLive}
+              groupAnimations={item.groupAnimations}
+              onUpdateSlide={isSong && bgTab === 'tempo' ? onUpdateSlide : undefined}
             />
           </div>
 
-          {/* ── TAP TEMPO PANEL — only for songs ── */}
-          {isSong && (
-            <TapTempoPanel
-              slides={item.slides}
-              activeSlideId={activeSlideId}
-              liveSlideId={liveSlideId}
-              background={item.background}
-              textStyle={item.textStyle}
-              bpm={tempo.bpm}
-              setBpm={tempo.setBpm}
-              currentBeat={tempo.currentBeat}
-              tapCount={tempo.tapCount}
-              isRunning={tempo.isRunning}
-              tap={tempo.tap}
-              stop={tempo.stop}
-              reset={tempo.reset}
-              beatsPerSlide={beatsPerSlide}
-              setBeatsPerSlide={setBeatsPerSlide}
-              isSongLive={isSongLive}
-              onSelectSlide={onSelectSlide}
-              onGoLiveSlide={onGoLiveSlide}
-            />
-          )}
+          {!isDeck && (<>
+          {/* ── BACKGROUND PLAYLIST | TAP TEMPO — 25 ── */}
+          <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '25 1 0' }}>
+            {(() => {
+              const tabs = isSong ? (
+                <div className="flex items-center gap-3 h-full">
+                  {([['playlist', 'Background Playlist'], ['tempo', 'Tap Tempo']] as const).map(([id, label]) => (
+                    <button key={id} onClick={() => setBgTab(id)}
+                      className="text-[10px] font-bold uppercase tracking-widest h-full flex items-center gap-1"
+                      style={{
+                        color: '#ffffff',
+                        opacity: bgTab === id ? 1 : 0.45,
+                        borderBottom: `2px solid ${bgTab === id ? '#3b82f6' : 'transparent'}`,
+                      }}>
+                      {label}
+                      {id === 'tempo' && tempo.isRunning && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" title={`${tempo.bpm} BPM`} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : undefined
+              return (
+                <>
+                  {(!isSong || bgTab === 'playlist') && (
+                    <BackgroundPlaylistPanel
+                      embedded
+                      title={tabs}
+                      playlist={item.bgPlaylist ?? []}
+                      activeBgId={item.activeBgId}
+                      isLive={isSongLive}
+                      onUpdate={onUpdateItem}
+                      onUploadFiles={bgLibrary.addUploads}
+                    />
+                  )}
+                  {/* Kept mounted (hidden) so auto-advance and the T key keep working on the other tab */}
+                  {isSong && (
+                    <div className="flex-1 min-h-0 flex-col" style={{ display: bgTab === 'tempo' ? 'flex' : 'none' }}>
+                      <PanelHeader title={tabs}>
+                        <div className="flex-1" />
+                        <span className="text-[9px]" style={{ color: '#94a3b8' }}>T = tap · jeda per slide di Slide Grid</span>
+                      </PanelHeader>
+                      <TapTempoPanel
+                        slides={item.slides}
+                        activeSlideId={activeSlideId}
+                        liveSlideId={liveSlideId}
+                        background={pickedBackground(item) ?? item.background}
+                        textStyle={item.textStyle}
+                        bpm={tempo.bpm}
+                        setBpm={tempo.setBpm}
+                        currentBeat={tempo.currentBeat}
+                        tapCount={tempo.tapCount}
+                        isRunning={tempo.isRunning}
+                        tap={tempo.tap}
+                        stop={tempo.stop}
+                        reset={tempo.reset}
+                        beatsPerSlide={beatsPerSlide}
+                        setBeatsPerSlide={setBeatsPerSlide}
+                        isSongLive={isSongLive}
+                        onSelectSlide={onSelectSlide}
+                        onGoLiveSlide={onGoLiveSlide}
+                      />
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+
+          {/* ── TEXT ANIMATION — 20 ── */}
+          <TextAnimationPanel
+            item={item}
+            activeSlide={activeSlide}
+            background={pickedBackground(item) ?? activeSlide?.backgroundOverride ?? item.background}
+            onChangeDefault={animation => onUpdateTextStyle({ animation })}
+            onChangeGroup={onUpdateGroupAnimation}
+          />
+
+          {/* ── BACKGROUND LIBRARY — 15 ── */}
+          <BackgroundLibraryPanel
+            lib={bgLibrary}
+            onAddToPlaylist={entry => onUpdateItem({ bgPlaylist: playlistInsert(item.bgPlaylist ?? [], entry) })}
+          />
+          </>)}
         </>
       )}
     </div>

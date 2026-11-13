@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@easychurch/db": "workspace:*",
-    "better-sqlite3": "^11.5.0"
+    "better-sqlite3": "^12.11.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

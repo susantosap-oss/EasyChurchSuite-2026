@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { SlideCanvas } from '../shared/SlideCanvas'
-import type { Slide, SlideBackground, TextStyle } from '../types'
+import type { Slide, SlideBackground, TextStyle, TextAnimation } from '../types'
+import { animGroupKey } from '../types'
+import { groupColor } from '../left/AddSongModal'
 
 const JEDA_OPTIONS = [1, 2, 4, 8]
 
@@ -15,20 +17,28 @@ interface Props {
   onSelect: (id: string) => void
   onGoLive: (id: string) => void
   onUpdateSlide?: (id: string, updates: Partial<Slide>) => void
+  isItemLive?: boolean   // this item is on output → single click sends slide live
+  groupAnimations?: Record<string, TextAnimation>
 }
 
 export function SlideGrid({
   slides, activeSlideId, liveSlideId, background, textStyle,
-  onSelect, onGoLive, onUpdateSlide,
+  onSelect, onGoLive, onUpdateSlide, isItemLive = false, groupAnimations,
 }: Props) {
   const [jedaEditId, setJedaEditId] = useState<string | null>(null)
 
   return (
     <div className="h-full overflow-y-auto p-4">
       <div className="flex items-center gap-1.5 mb-2 px-0.5">
-        <span className="text-[9px]" style={{ color: '#374151' }}>Klik = pilih</span>
-        <span className="text-[9px]" style={{ color: '#2d3748' }}>·</span>
-        <span className="text-[9px] font-semibold" style={{ color: '#dc2626' }}>2× = Go Live</span>
+        {isItemLive ? (
+          <span className="text-[9px] font-semibold" style={{ color: '#f87171' }}>● LIVE — Klik = tampilkan slide ke output</span>
+        ) : (
+          <>
+            <span className="text-[9px]" style={{ color: '#94a3b8' }}>Klik = pilih</span>
+            <span className="text-[9px]" style={{ color: '#475569' }}>·</span>
+            <span className="text-[9px] font-semibold" style={{ color: '#f87171' }}>2× = Go Live</span>
+          </>
+        )}
       </div>
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}>
         {slides.map((slide, idx) => {
@@ -41,14 +51,15 @@ export function SlideGrid({
             ? { ...textStyle, ...slide.textStyleOverride }
             : textStyle
 
-          const hasJeda     = !!slide.jedaBars && slide.jedaBars > 0
+          // Jeda (tap-tempo pause) is only editable when onUpdateSlide is provided
+          const hasJeda     = !!onUpdateSlide && !!slide.jedaBars && slide.jedaBars > 0
           const isEditingJeda = jedaEditId === slide.id
 
           return (
             <div key={slide.id} className="flex flex-col">
               {/* Slide card */}
               <button
-                onClick={() => onSelect(slide.id)}
+                onClick={() => (isItemLive ? onGoLive(slide.id) : onSelect(slide.id))}
                 onDoubleClick={() => onGoLive(slide.id)}
                 className="text-left rounded-xl overflow-hidden transition-all"
                 style={{
@@ -63,7 +74,7 @@ export function SlideGrid({
                 {/* 16:9 preview */}
                 <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
                   <div className="absolute inset-0">
-                    <SlideCanvas text={slide.text} background={bg} textStyle={ts} containerWidth={110} />
+                    <SlideCanvas text={slide.text} background={bg} textStyle={ts} containerWidth={110} image={slide.image} thumbnail />
                   </div>
 
                   {(slide.backgroundOverride || slide.textStyleOverride) && (
@@ -91,12 +102,16 @@ export function SlideGrid({
                     style={{ color: isActive ? '#93c5fd' : '#64748b' }}>
                     {slide.label}
                   </span>
+                  {groupAnimations?.[animGroupKey(slide.label)] && (
+                    <span className="text-[9px] flex-shrink-0" title={`Animasi grup ${animGroupKey(slide.label)}`}
+                      style={{ color: groupColor(slide.label) }}>✨</span>
+                  )}
                   {isActive && <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: '#3b82f6' }} />}
                 </div>
               </button>
 
-              {/* Jeda row — shown on all slides */}
-              {(
+              {/* Jeda row — only when jeda editing is enabled */}
+              {onUpdateSlide && (
                 <div
                   className="flex items-center justify-center"
                   style={{

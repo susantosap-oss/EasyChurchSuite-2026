@@ -5,15 +5,15 @@ export async function GET() {
   try {
     const db = getPresenterDb() as unknown as import('better-sqlite3').Database
     const songs = db.prepare(`
-      SELECT id, title, artist FROM songs ORDER BY title COLLATE NOCASE
-    `).all() as { id: number; title: string; artist: string }[]
+      SELECT id, title, artist, settings FROM songs ORDER BY title COLLATE NOCASE
+    `).all() as { id: number; title: string; artist: string; settings: string | null }[]
 
     const result = songs.map(song => {
       const slides = (db.prepare(`
         SELECT id, slide_order, label, lyrics FROM song_slides
         WHERE song_id = ? ORDER BY slide_order
       `).all(song.id)) as { id: number; slide_order: number; label: string; lyrics: string }[]
-      return { ...song, slides }
+      return { ...song, settings: song.settings ? JSON.parse(song.settings) : null, slides }
     })
 
     return NextResponse.json({ songs: result })

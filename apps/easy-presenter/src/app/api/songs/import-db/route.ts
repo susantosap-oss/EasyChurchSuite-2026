@@ -4,6 +4,8 @@ import { writeFileSync, unlinkSync, existsSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import { rtfToText } from '@/lib/rtf'
+import { parseLyrics } from '@/lib/lyrics'
 
 type SongData = {
   title: string
@@ -18,14 +20,13 @@ const EW_TYPE_MAP: Record<string, string> = {
 }
 
 export async function POST(req: NextRequest) {
-  const form = await req.formData()
-  const file = form.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
+  const form  = await req.formData()
+  const files = form.getAll('file').filter((f): f is File => f instanceof File)
+  if (!files.length) return NextResponse.json({ error: 'File tidak ditemukan' }, { status: 400 })
 
   try {
-    const songs = file.name.toLowerCase().endsWith('.json')
-      ? await parseJson(file)
-      : await parseSqliteDb(file)
+    const jsonFile = files.find(f => f.name.toLowerCase().endsWith('.json'))
+    const songs = jsonFile ? await parseJson(jsonFile) : await parseSqliteDbs(files)
 
     if (songs.length === 0) {
       return NextResponse.json(
@@ -53,20 +54,79 @@ async function parseJson(file: File): Promise<SongData[]> {
 
 // ── SQLite auto-detect ────────────────────────────────────────────────────────
 
-async function parseSqliteDb(file: File): Promise<SongData[]> {
-  const buffer  = Buffer.from(await file.arrayBuffer())
-  const tmpPath = join(tmpdir(), `ep_import_${randomUUID()}.db`)
+type Db = import('better-sqlite3').Database
+
+/** Open every uploaded .db read-only; EasyWorship needs Songs.db + SongWords.db together */
+async function parseSqliteDbs(files: File[]): Promise<SongData[]> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const BetterSqlite = require('better-sqlite3') as typeof import('better-sqlite3')
+  const tmpPaths: string[] = []
+  const dbs: Array<{ name: string; db: Db }> = []
   try {
-    writeFileSync(tmpPath, buffer)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const BetterSqlite = require('better-sqlite3') as typeof import('better-sqlite3')
-    const db = new BetterSqlite(tmpPath, { readonly: true })
-    const songs = extractSongs(db)
-    db.close()
-    return songs
+    for (const file of files) {
+      const tmpPath = join(tmpdir(), `ep_import_${randomUUID()}.db`)
+      tmpPaths.push(tmpPath)
+      writeFileSync(tmpPath, Buffer.from(await file.arrayBuffer()))
+      try {
+        dbs.push({ name: file.name, db: new BetterSqlite(tmpPath, { readonly: true }) })
+      } catch {
+        throw new Error(`${file.name} bukan file database SQLite yang valid`)
+      }
+    }
+
+    // EasyWorship 6/7: Songs.db (table "song") + SongWords.db (table "word", RTF lyrics)
+    const songsDb = dbs.find(d => isEwSongsDb(d.db))
+    const wordsDb = dbs.find(d => isEwWordsDb(d.db))
+    if (songsDb && wordsDb) return extractEasyWorship(songsDb.db, wordsDb.db)
+    if (songsDb && !wordsDb && !hasLyricsColumn(songsDb.db, 'song')) {
+      throw new Error('Ini Songs.db EasyWorship — liriknya ada di SongWords.db. Pilih Songs.db dan SongWords.db bersamaan.')
+    }
+    if (wordsDb && !songsDb) {
+      throw new Error('Ini SongWords.db EasyWorship — judul lagunya ada di Songs.db. Pilih Songs.db dan SongWords.db bersamaan.')
+    }
+
+    return dbs.flatMap(d => extractSongs(d.db))
   } finally {
-    if (existsSync(tmpPath)) unlinkSync(tmpPath)
+    dbs.forEach(d => d.db.close())
+    tmpPaths.forEach(p => { if (existsSync(p)) unlinkSync(p) })
   }
+}
+
+// ── EasyWorship 6/7 ───────────────────────────────────────────────────────────
+
+function isEwSongsDb(db: Db): boolean {
+  return getTables(db).some(t => t.toLowerCase() === 'song') &&
+    pickCol(getTableCols(db, 'song'), ['title']) !== null
+}
+
+function isEwWordsDb(db: Db): boolean {
+  if (!getTables(db).some(t => t.toLowerCase() === 'word')) return false
+  const cols = getTableCols(db, 'word')
+  return pickCol(cols, ['song_id']) !== null && pickCol(cols, ['words']) !== null
+}
+
+function hasLyricsColumn(db: Db, table: string): boolean {
+  return pickCol(getTableCols(db, table), ['lyrics', 'text', 'content', 'words']) !== null
+}
+
+function extractEasyWorship(songsDb: Db, wordsDb: Db): SongData[] {
+  const authorCol = pickCol(getTableCols(songsDb, 'song'), ['author', 'artist'])
+  const songs = songsDb.prepare(
+    `SELECT rowid AS id, title${authorCol ? `, "${authorCol}" AS author` : ''} FROM song`
+  ).all() as { id: number; title: string | null; author?: string | null }[]
+  const getWords = wordsDb.prepare('SELECT words FROM word WHERE song_id = ? ORDER BY rowid LIMIT 1')
+
+  return songs.map(song => {
+    const row  = getWords.get(song.id) as { words: string | Buffer | null } | undefined
+    const raw  = row?.words == null ? '' : Buffer.isBuffer(row.words) ? row.words.toString('latin1') : row.words
+    const text = rtfToText(raw)
+    return {
+      title:  (song.title ?? '').trim(),
+      artist: (song.author ?? '').trim(),
+      // EasyWorship: a label line ("Verse 1", "Chorus") starts a section, blank line = new slide
+      slides: parseLyrics(text),
+    }
+  }).filter(s => s.title && s.slides.length > 0)
 }
 
 // ── Schema detection + extraction ─────────────────────────────────────────────

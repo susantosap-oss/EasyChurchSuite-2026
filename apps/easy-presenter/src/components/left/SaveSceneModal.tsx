@@ -2,19 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import type { ServiceItem } from '../types'
+import { stripBlobUrls } from '../types'
+import { saveAllSongSettings } from '../shared/songSettings'
 
 interface Scene { id: number; name: string; service_date: string | null; created_at: string }
 
+/** The scene currently open in the presenter (for overwrite) */
+export interface SceneRef { id: number; name: string; date: string | null }
+
 interface Props {
   items: ServiceItem[]
+  currentScene: SceneRef | null
   onClose: () => void
-  onLoad: (items: ServiceItem[]) => void
+  onLoad: (items: ServiceItem[], scene: SceneRef) => void
+  onSaved: (scene: SceneRef) => void
 }
 
-export function SaveSceneModal({ items, onClose, onLoad }: Props) {
+export function SaveSceneModal({ items, currentScene, onClose, onLoad, onSaved }: Props) {
   const [tab, setTab]           = useState<'save' | 'load'>('save')
-  const [name, setName]         = useState('')
-  const [date, setDate]         = useState('')
+  const [name, setName]         = useState(currentScene?.name ?? '')
+  const [date, setDate]         = useState(currentScene?.date ?? '')
+  const [alsoSongs, setAlsoSongs] = useState(true)
   const [saving, setSaving]     = useState(false)
   const [scenes, setScenes]     = useState<Scene[]>([])
   const [loading, setLoading]   = useState(false)
@@ -37,27 +45,34 @@ export function SaveSceneModal({ items, onClose, onLoad }: Props) {
     finally { setLoading(false) }
   }
 
-  const handleSave = async () => {
+  // overwrite = replace the currently open scene; otherwise create a new one
+  const handleSave = async (overwrite: boolean) => {
     setError(''); setSuccess('')
     if (!name.trim()) { setError('Nama scene wajib diisi'); return }
 
     setSaving(true)
     try {
-      const payload = items.map(item => {
-        // Strip blob URLs from media items (non-serializable across sessions)
-        if (item.type === 'media') return { ...item, mediaUrl: undefined }
-        return item
-      })
+      // Blob URLs (session-only uploads) are dead after a reload — drop them
+      const payload = stripBlobUrls(items.filter(i => i.id !== '__quick__'))
+      const body    = JSON.stringify({ name: name.trim(), service_date: date || null, items: payload })
 
-      const res = await fetch('/api/scenes/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), service_date: date || null, items: payload }),
-      })
+      const res = overwrite && currentScene
+        ? await fetch(`/api/scenes/${currentScene.id}/`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body })
+        : await fetch('/api/scenes/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
       const data = await res.json() as { id?: number; error?: string }
-      if (!res.ok || data.error) throw new Error(data.error ?? 'Gagal menyimpan')
-      setSuccess(`Scene "${name.trim()}" berhasil disimpan!`)
-      setName('')
+      if (!res.ok || data.error || !data.id) throw new Error(data.error ?? 'Gagal menyimpan')
+      onSaved({ id: data.id, name: name.trim(), date: date || null })
+
+      let msg = `Scene "${name.trim()}" berhasil ${overwrite ? 'diperbarui' : 'disimpan'}!`
+      if (alsoSongs) {
+        try {
+          const n = await saveAllSongSettings(items)
+          if (n) msg += ` Setting ${n} lagu juga disimpan ke database lagu.`
+        } catch (e) {
+          msg += ` (Setting lagu gagal disimpan: ${e instanceof Error ? e.message : 'error'})`
+        }
+      }
+      setSuccess(msg)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
     } finally {
@@ -65,14 +80,15 @@ export function SaveSceneModal({ items, onClose, onLoad }: Props) {
     }
   }
 
-  const handleLoad = async (id: number) => {
+  const handleLoad = async (scene: Scene) => {
+    const id = scene.id
     setLoadingId(id)
     try {
       const res = await fetch(`/api/scenes/${id}/`)
       const data = await res.json() as { items?: ServiceItem[]; error?: string }
       if (!res.ok || data.error) throw new Error(data.error ?? 'Gagal memuat')
       if (data.items?.length) {
-        onLoad(data.items)
+        onLoad(data.items, { id, name: scene.name, date: scene.service_date })
         onClose()
       }
     } catch (err) {
@@ -121,7 +137,7 @@ export function SaveSceneModal({ items, onClose, onLoad }: Props) {
               className="flex-1 py-2.5 text-xs font-semibold transition-colors"
               style={{
                 background: tab === t ? '#1e2535' : 'transparent',
-                color: tab === t ? '#93c5fd' : '#475569',
+                color: '#ffffff',
                 borderBottom: tab === t ? '2px solid #3b82f6' : '2px solid transparent',
               }}
             >
@@ -158,21 +174,50 @@ export function SaveSceneModal({ items, onClose, onLoad }: Props) {
                   style={{ background: '#0f1117', border: '1px solid #2a3347', color: '#f1f5f9', colorScheme: 'dark' }}
                 />
               </div>
-              <div className="px-3 py-2 rounded-lg text-[11px]" style={{ background: '#0d1520', color: '#64748b' }}>
-                Menyimpan {items.length} item urutan ibadah saat ini
+              <div className="px-3 py-2 rounded-lg text-[11px]" style={{ background: '#0d1520', color: '#94a3b8' }}>
+                Menyimpan {items.length} item urutan ibadah — termasuk background playlist & animasi teks tiap lagu
               </div>
+
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={alsoSongs} onChange={e => setAlsoSongs(e.target.checked)} className="mt-0.5" />
+                <span className="text-[11px]" style={{ color: '#e2e8f0' }}>
+                  Simpan juga sebagai <b>default lagu</b> di database
+                  <span className="block text-[10px]" style={{ color: '#94a3b8' }}>
+                    Saat lagu ini dipakai di urutan ibadah lain, setting ini otomatis terpakai
+                  </span>
+                </span>
+              </label>
 
               {error && <div className="px-3 py-2 rounded-lg text-xs" style={{ background: '#3b1515', color: '#fca5a5' }}>{error}</div>}
               {success && <div className="px-3 py-2 rounded-lg text-xs" style={{ background: '#14532d', color: '#86efac' }}>{success}</div>}
 
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold"
-                style={{ background: saving ? '#1e3a5f' : '#1d4ed8', color: 'white', opacity: saving ? 0.7 : 1 }}
-              >
-                {saving ? 'Menyimpan...' : '💾 Simpan Sekarang'}
-              </button>
+              {currentScene ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSave(true)}
+                    disabled={saving}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                    style={{ background: saving ? '#1e3a5f' : '#1d4ed8', color: 'white', opacity: saving ? 0.7 : 1 }}
+                  >
+                    {saving ? 'Menyimpan...' : `💾 Simpan (timpa "${currentScene.name}")`}
+                  </button>
+                  <button
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                    className="px-4 py-2.5 rounded-xl text-sm"
+                    style={{ background: '#1e2535', color: '#ffffff', border: '1px solid #2a3347', opacity: saving ? 0.7 : 1 }}
+                  >+ Simpan baru</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleSave(false)}
+                  disabled={saving}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold"
+                  style={{ background: saving ? '#1e3a5f' : '#1d4ed8', color: 'white', opacity: saving ? 0.7 : 1 }}
+                >
+                  {saving ? 'Menyimpan...' : '💾 Simpan Sekarang'}
+                </button>
+              )}
             </div>
           )}
 
@@ -202,7 +247,7 @@ export function SaveSceneModal({ items, onClose, onLoad }: Props) {
                     </div>
                   </div>
                   <button
-                    onClick={() => handleLoad(scene.id)}
+                    onClick={() => handleLoad(scene)}
                     disabled={loadingId === scene.id}
                     className="text-xs px-3 py-1.5 rounded-lg font-medium flex-shrink-0"
                     style={{ background: '#1d4ed8', color: 'white', opacity: loadingId === scene.id ? 0.6 : 1 }}

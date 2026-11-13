@@ -6,13 +6,14 @@ import type {
   AnimatedBgType, VerticalPosition, TextAlignMode,
 } from '../types'
 import { FontPickerModal } from '../shared/FontPickerModal'
+import { uploadBackgroundFile } from '../center/BackgroundPanels'
 
-const SOLID_PRESETS = [
+export const SOLID_PRESETS = [
   '#0a0f1a', '#000000', '#0f172a', '#1e0a3c', '#0a1a0a',
   '#1a0800', '#1a001a', '#001a1a', '#1a1a00', '#1a0a0a',
 ]
 
-const GRADIENT_PRESETS: { name: string; value: string }[] = [
+export const GRADIENT_PRESETS: { name: string; value: string }[] = [
   { name: 'Deep Space',   value: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)' },
   { name: 'Midnight',     value: 'linear-gradient(135deg, #0d1117 0%, #161b27 50%, #0d1b2a 100%)' },
   { name: 'Purple Night', value: 'linear-gradient(135deg, #1e0a3c 0%, #0a0a2e 100%)' },
@@ -23,7 +24,7 @@ const GRADIENT_PRESETS: { name: string; value: string }[] = [
   { name: 'Sunrise',      value: 'linear-gradient(135deg, #1a0a00 0%, #3d1a00 50%, #1a1a0a 100%)' },
 ]
 
-const ANIMATED_PRESETS: { id: AnimatedBgType; name: string }[] = [
+export const ANIMATED_PRESETS: { id: AnimatedBgType; name: string }[] = [
   { id: 'gradient-pulse', name: 'Deep Pulse' },
   { id: 'aurora',         name: 'Aurora' },
   { id: 'worship',        name: 'Worship' },
@@ -50,7 +51,7 @@ function SL({ children }: { children: string }) {
   return (
     <div className="px-3 py-1.5 flex-shrink-0 sticky top-0 z-10"
       style={{ background: '#161b27', borderBottom: '1px solid #2a3347' }}>
-      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>
+      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#ffffff' }}>
         {children}
       </span>
     </div>
@@ -137,9 +138,9 @@ export function FormatPanel({ background, textStyle, onUpdateBackground, onUpdat
               style={{ background: '#1e2535', border: '1px dashed #2a3347', color: '#64748b' }}>
               Pilih Gambar (JPG/PNG/WEBP)
               <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
-                onChange={e => {
+                onChange={async e => {
                   const f = e.target.files?.[0]
-                  if (f) onUpdateBackground({ ...background, imageUrl: URL.createObjectURL(f) })
+                  if (f) onUpdateBackground({ ...background, imageUrl: (await uploadBackgroundFile(f)).url })
                 }} />
             </label>
             {background.imageUrl && (
@@ -160,9 +161,9 @@ export function FormatPanel({ background, textStyle, onUpdateBackground, onUpdat
               style={{ background: '#1e2535', border: '1px dashed #2a3347', color: '#64748b' }}>
               Pilih Video (MP4, WebM, AVI, MPG)
               <input type="file" accept="video/*" className="hidden"
-                onChange={e => {
+                onChange={async e => {
                   const f = e.target.files?.[0]
-                  if (f) onUpdateBackground({ ...background, videoUrl: URL.createObjectURL(f) })
+                  if (f) onUpdateBackground({ ...background, videoUrl: (await uploadBackgroundFile(f)).url })
                 }} />
             </label>
             {background.videoUrl && (
@@ -207,12 +208,12 @@ export function FormatPanel({ background, textStyle, onUpdateBackground, onUpdat
               <span className="text-sm font-bold leading-none">+</span>
               <span className="text-[9px]">Upload Custom (MP4/WebM/GIF)</span>
               <input type="file" accept="video/*,.gif,image/gif" className="hidden"
-                onChange={e => {
+                onChange={async e => {
                   const f = e.target.files?.[0]
                   if (f) onUpdateBackground({
                     ...background,
                     animated: 'custom',
-                    animatedCustomUrl: URL.createObjectURL(f),
+                    animatedCustomUrl: (await uploadBackgroundFile(f)).url,
                     animatedCustomType: f.type === 'image/gif' ? 'gif' : 'video',
                   })
                 }} />

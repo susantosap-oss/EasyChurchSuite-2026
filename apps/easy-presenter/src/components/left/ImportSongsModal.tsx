@@ -22,24 +22,31 @@ const FORMAT_EXAMPLE = `{
 
 export function ImportSongsModal({ onClose, onImported }: Props) {
   const fileRef  = useRef<HTMLInputElement>(null)
-  const [file, setFile]       = useState<File | null>(null)
+  const [files, setFiles]     = useState<File[]>([])
   const [status, setStatus]   = useState<'idle' | 'importing' | 'done' | 'error'>('idle')
   const [result, setResult]   = useState<{ imported?: number; skipped?: number; total?: number } | null>(null)
   const [error, setError]     = useState('')
   const [showFormat, setShowFormat] = useState(false)
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    if (f) { setFile(f); setError(''); setStatus('idle'); setResult(null) }
+  const pickFiles = (list: FileList | null) => {
+    const picked = Array.from(list ?? []).filter(f => /\.(db|json)$/i.test(f.name))
+    if (picked.length) { setFiles(picked); setError(''); setStatus('idle'); setResult(null) }
   }
 
+  const names     = files.map(f => f.name.toLowerCase())
+  const ewSongs   = names.includes('songs.db')
+  const ewWords   = names.includes('songwords.db')
+  const ewMissing = ewSongs !== ewWords
+    ? (ewSongs ? 'SongWords.db' : 'Songs.db')
+    : null
+
   const handleImport = async () => {
-    if (!file) { setError('Pilih file terlebih dahulu'); return }
+    if (!files.length) { setError('Pilih file terlebih dahulu'); return }
     setStatus('importing')
     setError('')
     try {
       const form = new FormData()
-      form.append('file', file)
+      files.forEach(f => form.append('file', f))
       const res  = await fetch('/api/songs/import-db/', { method: 'POST', body: form })
       const json = await res.json() as {
         success?: boolean; imported?: number; skipped?: number; total?: number; error?: string
@@ -70,7 +77,7 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
           <div>
             <h2 className="text-sm font-bold" style={{ color: '#f1f5f9' }}>Import Database Lagu</h2>
             <p className="text-[10px] mt-0.5" style={{ color: '#475569' }}>
-              Import lagu dari OpenLP, EasyWorship, ProPresenter (.db) atau JSON
+              Import lagu dari EasyWorship 6/7, OpenLP, ProPresenter (.db) atau JSON
             </p>
           </div>
           <button onClick={onClose} className="text-lg leading-none" style={{ color: '#475569' }}>×</button>
@@ -101,11 +108,26 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
             )}
           </div>
 
+          {/* EasyWorship guide */}
+          <div className="px-3 py-2.5 rounded-xl space-y-1" style={{ background: '#0d1520', border: '1px solid #1e3a5f' }}>
+            <p className="text-[11px] font-semibold" style={{ color: '#ffffff' }}>EasyWorship 6 / 7</p>
+            <p className="text-[10px]" style={{ color: '#94a3b8' }}>
+              Pilih <b style={{ color: '#fbbf24' }}>Songs.db</b> dan <b style={{ color: '#fbbf24' }}>SongWords.db</b> sekaligus
+              (Ctrl+klik). Biasanya ada di:
+            </p>
+            <code className="block text-[9px] px-2 py-1 rounded break-all" style={{ background: '#0a0f1a', color: '#93c5fd' }}>
+              {'C:\\Users\\Public\\Documents\\Softouch\\EasyWorship\\Default\\…\\Databases\\Data'}
+            </code>
+            <p className="text-[10px]" style={{ color: '#94a3b8' }}>
+              Label Verse / Chorus / Bridge ikut terbawa sebagai grup slide. Tutup EasyWorship dulu sebelum menyalin file.
+            </p>
+          </div>
+
           {/* Source info */}
           <div className="text-[10px] space-y-1" style={{ color: '#475569' }}>
             <p>
               <span style={{ color: '#f1f5f9' }}>.db (SQLite)</span>
-              {' '}— terdeteksi otomatis: OpenLP, EasyWorship 6/7, ProPresenter 6
+              {' '}— terdeteksi otomatis: EasyWorship 6/7, OpenLP, ProPresenter 6
             </p>
             <p>
               <span style={{ color: '#f1f5f9' }}>.json</span>
@@ -123,25 +145,37 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
               className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer"
               style={{ border: '2px dashed #2a3347', background: '#0f1117' }}
               onClick={() => fileRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); pickFiles(e.dataTransfer.files) }}
             >
-              <div className="text-2xl">{file ? '🎵' : '📂'}</div>
-              <div className="flex-1">
-                {file ? (
+              <div className="text-2xl">{files.length ? '🎵' : '📂'}</div>
+              <div className="flex-1 min-w-0">
+                {files.length ? (
                   <>
-                    <p className="text-sm font-medium" style={{ color: '#f1f5f9' }}>{file.name}</p>
-                    <p className="text-[10px]" style={{ color: '#475569' }}>
-                      {(file.size / 1024).toFixed(0)} KB · klik untuk ganti
-                    </p>
+                    {files.map(f => (
+                      <p key={f.name} className="text-sm font-medium truncate" style={{ color: '#f1f5f9' }}>
+                        {f.name} <span className="text-[10px] font-normal" style={{ color: '#94a3b8' }}>
+                          · {(f.size / 1024).toFixed(0)} KB
+                        </span>
+                      </p>
+                    ))}
+                    <p className="text-[10px]" style={{ color: '#94a3b8' }}>klik / drop untuk ganti</p>
                   </>
                 ) : (
                   <>
-                    <p className="text-xs font-medium" style={{ color: '#64748b' }}>Klik untuk pilih file</p>
-                    <p className="text-[10px]" style={{ color: '#374151' }}>Format: .db · .json</p>
+                    <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>Klik atau drop file di sini</p>
+                    <p className="text-[10px]" style={{ color: '#64748b' }}>Format: .db · .json — boleh beberapa file</p>
                   </>
                 )}
               </div>
             </div>
-            <input ref={fileRef} type="file" accept=".db,.json" className="hidden" onChange={handleFileChange} />
+            <input ref={fileRef} type="file" accept=".db,.json" multiple className="hidden"
+              onChange={e => { pickFiles(e.target.files); if (fileRef.current) fileRef.current.value = '' }} />
+            {ewMissing && (
+              <p className="text-[10px] mt-1.5" style={{ color: '#fbbf24' }}>
+                ⚠ File EasyWorship belum lengkap — tambahkan juga <b>{ewMissing}</b> (pilih kedua file sekaligus)
+              </p>
+            )}
           </div>
 
           {/* Error */}
@@ -180,12 +214,12 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
           {status !== 'done' && (
             <button
               onClick={handleImport}
-              disabled={!file || status === 'importing'}
+              disabled={!files.length || status === 'importing'}
               className="px-5 py-2 rounded-lg text-sm font-semibold"
               style={{
-                background: !file ? '#1e2535' : '#1d4ed8',
-                color:      !file ? '#475569' : 'white',
-                cursor:     !file ? 'not-allowed' : 'pointer',
+                background: !files.length ? '#1e2535' : '#1d4ed8',
+                color:      !files.length ? '#475569' : 'white',
+                cursor:     !files.length ? 'not-allowed' : 'pointer',
                 opacity:    status === 'importing' ? 0.7 : 1,
               }}
             >

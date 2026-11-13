@@ -27,7 +27,7 @@ export function StudioPanel({ liveSlide }: Props = {}) {
 
       {/* Stage Monitor mini */}
       <div className="p-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest block mb-2" style={{ color: '#475569' }}>
+        <span className="text-[10px] font-semibold uppercase tracking-widest block mb-2" style={{ color: '#ffffff' }}>
           Stage Monitor
         </span>
         <div
@@ -69,7 +69,7 @@ export function StudioPanel({ liveSlide }: Props = {}) {
       {/* Lower Thirds */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#475569' }}>
+          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#ffffff' }}>
             Lower Thirds
           </span>
           {ltLive && (
@@ -111,7 +111,7 @@ export function StudioPanel({ liveSlide }: Props = {}) {
       {/* PTZ Quick Controls */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#475569' }}>PTZ Kamera</span>
+          <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#ffffff' }}>PTZ Kamera</span>
           <button className="text-[10px] px-2 py-0.5 rounded"
             style={{ background: '#1e2535', color: '#3b82f6', border: '1px solid #2a3347' }}>
             + Tambah
@@ -148,7 +148,7 @@ export function StudioPanel({ liveSlide }: Props = {}) {
 
       {/* Connections */}
       <div className="p-3">
-        <span className="text-[10px] font-semibold uppercase tracking-widest block mb-2" style={{ color: '#475569' }}>
+        <span className="text-[10px] font-semibold uppercase tracking-widest block mb-2" style={{ color: '#ffffff' }}>
           Koneksi
         </span>
         <div className="space-y-1.5">

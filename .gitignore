@@ -15,3 +15,7 @@ ios/
 out/
 data/KJV.json
 data/t_kjv.json
+data/backgrounds/
+data/slides/
+dist-electron/
+data/media/

@@ -231,7 +231,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
               <>
                 <div className="px-2.5 pt-2 pb-0.5">
                   <span className="text-[9px] font-bold uppercase tracking-widest"
-                    style={{ color: '#374151' }}>Perjanjian Lama</span>
+                    style={{ color: '#ffffff' }}>Perjanjian Lama</span>
                 </div>
                 {filter(otBooks).map(book => (
                   <BookRow key={book.number} book={book}
@@ -243,7 +243,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
               <>
                 <div className="px-2.5 pt-2.5 pb-0.5">
                   <span className="text-[9px] font-bold uppercase tracking-widest"
-                    style={{ color: '#374151' }}>Perjanjian Baru</span>
+                    style={{ color: '#ffffff' }}>Perjanjian Baru</span>
                 </div>
                 {filter(ntBooks).map(book => (
                   <BookRow key={book.number} book={book}
@@ -327,7 +327,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
           </div>
           {verses.length > 0 && (
             <p className="text-[9px] mt-0.5" style={{ color: '#374151' }}>
-              ↑↓ = Live langsung · Enter / Ctrl+L = Live ayat ini
+              Klik 2× / Enter / Ctrl+L = Live ayat ini · ↑↓ = Live langsung
             </p>
           )}
         </div>
@@ -426,6 +426,8 @@ function VerseRow({ verse, selected, rowRef, onSelect, onLive, onAdd }: {
         borderLeft:   `2px solid ${selected ? '#3b82f6' : 'transparent'}`,
       }}
       onClick={onSelect}
+      onDoubleClick={() => { onSelect(); onLive() }}
+      title="Klik 2× untuk Live"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >

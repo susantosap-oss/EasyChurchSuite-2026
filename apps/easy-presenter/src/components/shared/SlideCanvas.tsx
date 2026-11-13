@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react'
 import type { SlideBackground, TextStyle, VerticalPosition } from '../types'
+import { AnimatedText, hasTextAnimation } from './AnimatedText'
 
 const DESIGN_WIDTH = 1920
 
@@ -25,16 +26,30 @@ interface Props {
   containerWidth?: number
   /** If true, renders at DESIGN_WIDTH (1920px) then CSS-scales down — more accurate preview */
   scaled?: boolean
+  /** Play textStyle.animation (output / previews only — thumbnails stay static) */
+  animate?: boolean
+  /** Slide picture (e.g. a PDF page) drawn letterboxed above the background */
+  image?: string
+  /** Static preview: videos show one paused frame, CSS animations are frozen (grids / libraries) */
+  thumbnail?: boolean
 }
 
-export function SlideCanvas({ text, background, textStyle, containerWidth = 284, scaled = false }: Props) {
+export function SlideCanvas({ text, background, textStyle, containerWidth = 284, scaled = false, animate = false, image, thumbnail = false }: Props) {
   const scale  = containerWidth / DESIGN_WIDTH
   const scaledOffset = scaled ? textStyle.positionOffset : textStyle.positionOffset * scale
   const fSize  = scaled ? textStyle.fontSize : Math.max(8, textStyle.fontSize * scale)
 
   // Background element — only apply CSS class for the 4 built-in animated presets
-  const bgClass = background.type === 'animated' && background.animated && background.animated !== 'custom'
-    ? `slide-bg-${background.animated}` : ''
+  const bgClass = [
+    background.type === 'animated' && background.animated && background.animated !== 'custom' ? `slide-bg-${background.animated}` : '',
+    thumbnail ? 'ec-static' : '',
+  ].filter(Boolean).join(' ')
+
+  // Thumbnails: paused first frame instead of a decoding, looping video
+  const videoProps = thumbnail
+    ? { preload: 'metadata' as const, muted: true, playsInline: true }
+    : { autoPlay: true, loop: true, muted: true, playsInline: true }
+  const videoSrc = (url: string) => (thumbnail ? `${url}#t=0.5` : url)
 
   const bgInline: CSSProperties = (() => {
     switch (background.type) {
@@ -68,6 +83,7 @@ export function SlideCanvas({ text, background, textStyle, containerWidth = 284,
     fontFamily:       textStyle.fontFamily,
     fontSize:         scaled ? textStyle.fontSize : fSize,
     fontWeight:       textStyle.fontWeight,
+    fontStyle:        textStyle.fontStyle ?? 'normal',
     textAlign:        textStyle.textAlign,
     color:            textStyle.color,
     lineHeight:       textStyle.lineHeight,
@@ -106,8 +122,8 @@ export function SlideCanvas({ text, background, textStyle, containerWidth = 284,
       {/* Video background */}
       {background.type === 'video' && background.videoUrl && (
         <video
-          src={background.videoUrl}
-          autoPlay loop muted playsInline
+          src={videoSrc(background.videoUrl)}
+          {...videoProps}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}
         />
       )}
@@ -123,8 +139,8 @@ export function SlideCanvas({ text, background, textStyle, containerWidth = 284,
           />
         ) : (
           <video
-            src={background.animatedCustomUrl}
-            autoPlay loop muted playsInline
+            src={videoSrc(background.animatedCustomUrl)}
+            {...videoProps}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}
           />
         )
@@ -141,9 +157,25 @@ export function SlideCanvas({ text, background, textStyle, containerWidth = 284,
         />
       )}
 
+      {/* Slide picture (presentation page) */}
+      {image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={image}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', zIndex: 1 }}
+        />
+      )}
+
       {/* Text layer */}
       <div style={textContainerStyle}>
-        <p style={textP}>{text}</p>
+        {animate && hasTextAnimation(textStyle.animation) ? (
+          // key restarts the entrance whenever the slide text or settings change
+          <AnimatedText key={text + JSON.stringify(textStyle.animation)}
+            text={text} anim={textStyle.animation} style={textP} />
+        ) : (
+          <p style={textP}>{text}</p>
+        )}
       </div>
     </div>
   )

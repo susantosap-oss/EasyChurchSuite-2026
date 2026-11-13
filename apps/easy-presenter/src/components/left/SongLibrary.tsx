@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { ServiceItem } from '../types'
+import type { ServiceItem, SongSettings } from '../types'
+import { applySongSettings, SONG_SETTINGS_SAVED, type SongSettingsSavedDetail } from '../shared/songSettings'
 import { DEFAULT_SONG_BG, DEFAULT_TEXT_STYLE } from '../types'
 import { AddSongModal } from './AddSongModal'
 import { ImportSongsModal } from './ImportSongsModal'
@@ -10,11 +11,13 @@ interface DbSong {
   id: number
   title: string
   artist: string
+  settings?: SongSettings | null   // saved presenter defaults
   slides: Array<{ id: number; slide_order: number; label: string; lyrics: string }>
 }
 
 interface Props {
-  onAdd: (item: ServiceItem) => void
+  /** hasSavedSettings = song already has presenter defaults in the DB (skip app defaults) */
+  onAdd: (item: ServiceItem, hasSavedSettings?: boolean) => void
 }
 
 export function SongLibrary({ onAdd }: Props) {
@@ -37,6 +40,16 @@ export function SongLibrary({ onAdd }: Props) {
 
   useEffect(() => { fetchSongs() }, [])
 
+  // Keep cached defaults in sync when a song's settings are saved elsewhere
+  useEffect(() => {
+    const onSaved = (e: Event) => {
+      const { songId, settings } = (e as CustomEvent<SongSettingsSavedDetail>).detail
+      setSongs(prev => prev.map(s => (s.id === songId ? { ...s, settings } : s)))
+    }
+    window.addEventListener(SONG_SETTINGS_SAVED, onSaved)
+    return () => window.removeEventListener(SONG_SETTINGS_SAVED, onSaved)
+  }, [])
+
   const filtered = songs.filter(s =>
     !q || s.title.toLowerCase().includes(q.toLowerCase()) ||
     s.artist.toLowerCase().includes(q.toLowerCase())
@@ -45,6 +58,7 @@ export function SongLibrary({ onAdd }: Props) {
   const addToService = (song: DbSong) => {
     const item: ServiceItem = {
       id: `song_${song.id}_${Date.now()}`,
+      songId: song.id,
       type: 'song',
       title: song.title,
       subtitle: song.artist || '',
@@ -56,7 +70,7 @@ export function SongLibrary({ onAdd }: Props) {
       background: { ...DEFAULT_SONG_BG },
       textStyle: { ...DEFAULT_TEXT_STYLE },
     }
-    onAdd(item)
+    onAdd(applySongSettings(item, song.settings), !!song.settings)
   }
 
   const handleDelete = async (id: number) => {
@@ -72,10 +86,14 @@ export function SongLibrary({ onAdd }: Props) {
   }
 
   const handleAdded = (item: ServiceItem) => {
+    const dbId = parseInt(item.id.split('_')[1] ?? '')
+    // Songs added without a DB save (fallback) only go to the service, not the library
+    if (Number.isNaN(dbId)) { onAdd(item); return }
     setSongs(prev => [...prev, {
-      id: parseInt(item.id.split('_')[1] ?? '0'),
+      id: dbId,
       title: item.title,
       artist: item.subtitle,
+      settings: null,
       slides: item.slides.map((s, i) => ({
         id: i,
         slide_order: i + 1,

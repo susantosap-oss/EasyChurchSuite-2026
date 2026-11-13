@@ -7,4 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeAllListeners('slide:command')
   },
   getDisplays: () => ipcRenderer.invoke('app:get-displays'),
+  applyNativeSettings: (s: unknown) => ipcRenderer.invoke('settings:apply-native', s),
+  getGpuInfo: () => ipcRenderer.invoke('app:gpu-info'),
+  relaunch: () => ipcRenderer.send('app:relaunch'),
 })

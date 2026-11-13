@@ -189,8 +189,8 @@ export function TapTempoPanel({
 
   return (
     <div
-      className="flex-shrink-0 select-none flex"
-      style={{ background: '#080c14', borderTop: '1px solid #2a3347', height: 198 }}
+      className="flex-1 min-h-0 select-none flex"
+      style={{ background: '#080c14' }}
     >
       {/* ── LEFT FRAME: controls ───────────────────────────────────────── */}
       <div
@@ -216,7 +216,7 @@ export function TapTempoPanel({
               willChange: 'transform',
             }}
           />
-          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#ffffff' }}>
             Tap Tempo
           </span>
           {isRunning && (
@@ -344,7 +344,7 @@ export function TapTempoPanel({
       >
         {/* Monitor header */}
         <div className="flex items-center gap-1.5 mb-1.5 flex-shrink-0">
-          <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#2d3748' }}>Monitor</span>
+          <span className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#ffffff' }}>Monitor</span>
           {previewSlide && (
             <span className="text-[9px] px-1.5 py-0.5 rounded truncate"
               style={{ background: '#1e2535', color: '#64748b', maxWidth: 120 }}>

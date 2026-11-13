@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { OutputPanel } from './OutputPanel'
 import { StudioPanel } from './StudioPanel'
 import { FormatPanel } from './FormatPanel'
-import type { Slide, ServiceItem, SlideBackground, TextStyle } from '../types'
+import type { Slide, ServiceItem, SlideBackground, TextStyle, MediaControl, MediaStatus } from '../types'
 
 type BottomTab = 'format' | 'studio'
 
@@ -21,6 +21,8 @@ interface Props {
   liveTextStyle: TextStyle
   liveMediaUrl?: string
   liveMediaType?: 'image' | 'video' | 'pdf'
+  mediaControl: MediaControl
+  onMediaStatus: (status: MediaStatus) => void
   onUpdateBackground: (bg: SlideBackground) => void
   onUpdateTextStyle: (style: Partial<TextStyle>) => void
 }
@@ -49,7 +51,7 @@ export function RightPanel(props: Props) {
           className="px-3 py-1 flex items-center gap-2 flex-shrink-0"
           style={{ background: '#161b27', borderBottom: '1px solid #2a3347' }}
         >
-          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#475569' }}>Output</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#ffffff' }}>Output</span>
           {props.isLive && !props.isBlank && (
             <span className="flex items-center gap-1 text-[9px] font-bold" style={{ color: '#dc2626' }}>
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -88,7 +90,7 @@ export function RightPanel(props: Props) {
               className="px-3 py-0.5 rounded text-xs font-medium transition-colors capitalize"
               style={{
                 background:   tab === t ? '#1e2535' : 'transparent',
-                color:        tab === t ? '#93c5fd' : '#475569',
+                color:        '#ffffff',
                 borderBottom: tab === t ? '2px solid #3b82f6' : '2px solid transparent',
               }}
             >

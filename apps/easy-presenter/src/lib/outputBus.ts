@@ -5,6 +5,14 @@ import type { AppSettings } from '@/components/settings/appSettings'
 
 export const OUTPUT_CHANNEL = 'easychurch-output'
 
+/** Studio → Running Text: ticker strip shown over whatever is live */
+export interface RunningText {
+  text: string
+  direction: 'ltr' | 'rtl'
+  /** Frame widths per second */
+  speed: number
+}
+
 export interface OutputState {
   blank: boolean
   /** Live text slide (null = nothing on screen) */
@@ -16,6 +24,12 @@ export interface OutputState {
   media: { url: string; type: 'image' | 'video' | 'pdf' } | null
   /** Video sync: output windows follow the operator's master player (muted) */
   video: { playing: boolean; currentTime: number; loop: boolean } | null
+  runningText: RunningText | null
+  /** Per output: chroma key colour replacing every background (null = off); subtitle = text forced to the bottom */
+  key: {
+    display1: { color: string | null; subtitle: boolean }
+    display2: { color: string | null; subtitle: boolean }
+  }
   display2: AppSettings['display2']
   display2Mode: AppSettings['output']['display2']['mode']
   lowSpec: boolean

@@ -2,25 +2,34 @@
 
 import { useState } from 'react'
 import type { Slide } from '../types'
+import type { RunningText } from '@/lib/outputBus'
 
 interface Props {
   liveSlide?: Slide | null
+  runningText: RunningText | null
+  onRunningText: (rt: RunningText | null) => void
 }
 
-export function StudioPanel({ liveSlide }: Props = {}) {
-  const [ltName, setLtName]   = useState('')
-  const [ltTitle, setLtTitle] = useState('')
-  const [ltLive, setLtLive]   = useState(false)
+const SPEEDS = [
+  { label: 'Lambat', value: 0.08 },
+  { label: 'Sedang', value: 0.14 },
+  { label: 'Cepat',  value: 0.22 },
+] as const
 
-  const pushLowerThird = () => {
-    if (!ltName) return
-    window.electronAPI?.sendSlideCommand({ type: 'lower-third', name: ltName, title: ltTitle })
-    setLtLive(true)
+export function StudioPanel({ liveSlide, runningText, onRunningText }: Props) {
+  // Draft survives tab switches because it starts from what is on air
+  const [text, setText]           = useState(runningText?.text ?? '')
+  const [direction, setDirection] = useState<RunningText['direction']>(runningText?.direction ?? 'ltr')
+  const [speed, setSpeed]         = useState<number>(runningText?.speed ?? SPEEDS[1].value)
+  const isOnAir = runningText != null
+
+  const push = (patch: Partial<RunningText> = {}) => {
+    const next = { text: text.trim(), direction, speed, ...patch }
+    if (next.text) onRunningText(next)
   }
-  const clearLowerThird = () => {
-    window.electronAPI?.sendSlideCommand({ type: 'clear' })
-    setLtLive(false)
-  }
+  // Direction / speed changes apply straight away while the ticker is on air
+  const changeDirection = (d: RunningText['direction']) => { setDirection(d); if (isOnAir) push({ direction: d }) }
+  const changeSpeed     = (v: number) => { setSpeed(v); if (isOnAir) push({ speed: v }) }
 
   return (
     <div className="flex flex-col flex-1 overflow-y-auto">
@@ -66,39 +75,62 @@ export function StudioPanel({ liveSlide }: Props = {}) {
 
       <div className="mx-3 my-1" style={{ height: '1px', background: '#2a3347' }} />
 
-      {/* Lower Thirds */}
+      {/* Running Text */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#ffffff' }}>
-            Lower Thirds
+            Running Text
           </span>
-          {ltLive && (
+          {isOnAir && (
             <span className="text-[9px] px-1.5 py-0.5 rounded" style={{ background: '#dc2626', color: 'white' }}>LIVE</span>
           )}
         </div>
         <div className="space-y-2">
-          <div>
-            <label className="text-[10px] block mb-1" style={{ color: '#475569' }}>Nama</label>
-            <input value={ltName} onChange={e => setLtName(e.target.value)}
-              placeholder="Pdt. Yohanes Santoso"
-              className="w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none"
-              style={{ background: '#1e2535', border: '1px solid #2a3347', color: '#e2e8f0' }} />
+          <textarea value={text} onChange={e => setText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); push() } }}
+            rows={2}
+            placeholder="Selamat datang di ibadah raya · Persekutuan Pemuda Sabtu pkl 17.00"
+            className="w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none resize-none"
+            style={{ background: '#1e2535', border: '1px solid #2a3347', color: '#e2e8f0' }} />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] w-12" style={{ color: '#475569' }}>Arah</span>
+            {([['ltr', 'Kiri → Kanan'], ['rtl', 'Kanan → Kiri']] as const).map(([d, label]) => (
+              <button key={d} onClick={() => changeDirection(d)}
+                className="flex-1 py-1 rounded text-[10px] font-medium"
+                style={{
+                  background: direction === d ? '#1d4ed8' : '#1e2535',
+                  color:      direction === d ? 'white' : '#94a3b8',
+                  border:     '1px solid #2a3347',
+                }}>
+                {label}
+              </button>
+            ))}
           </div>
-          <div>
-            <label className="text-[10px] block mb-1" style={{ color: '#475569' }}>Jabatan</label>
-            <input value={ltTitle} onChange={e => setLtTitle(e.target.value)}
-              placeholder="Gembala Sidang"
-              className="w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none"
-              style={{ background: '#1e2535', border: '1px solid #2a3347', color: '#e2e8f0' }} />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] w-12" style={{ color: '#475569' }}>Speed</span>
+            {SPEEDS.map(sp => (
+              <button key={sp.label} onClick={() => changeSpeed(sp.value)}
+                className="flex-1 py-1 rounded text-[10px] font-medium"
+                style={{
+                  background: speed === sp.value ? '#1d4ed8' : '#1e2535',
+                  color:      speed === sp.value ? 'white' : '#94a3b8',
+                  border:     '1px solid #2a3347',
+                }}>
+                {sp.label}
+              </button>
+            ))}
           </div>
+
           <div className="grid grid-cols-2 gap-2 pt-1">
-            <button onClick={pushLowerThird}
-              className="py-2 rounded-lg text-xs font-semibold"
+            <button onClick={() => push()} disabled={!text.trim()}
+              className="py-2 rounded-lg text-xs font-semibold disabled:opacity-40"
               style={{ background: '#1d4ed8', color: 'white' }}>
-              Push Live
+              {isOnAir ? 'Update' : 'Push Live'}
             </button>
-            <button onClick={clearLowerThird}
-              className="py-2 rounded-lg text-xs font-medium"
+            <button onClick={() => onRunningText(null)} disabled={!isOnAir}
+              className="py-2 rounded-lg text-xs font-medium disabled:opacity-40"
               style={{ background: '#1e2535', color: '#94a3b8', border: '1px solid #2a3347' }}>
               Clear
             </button>

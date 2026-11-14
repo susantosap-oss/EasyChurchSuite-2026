@@ -5,6 +5,7 @@ import { OutputPanel } from './OutputPanel'
 import { StudioPanel } from './StudioPanel'
 import { FormatPanel } from './FormatPanel'
 import type { Slide, ServiceItem, SlideBackground, TextStyle, MediaControl, MediaStatus } from '../types'
+import type { RunningText } from '@/lib/outputBus'
 
 type BottomTab = 'format' | 'studio'
 
@@ -19,6 +20,11 @@ interface Props {
   activeItem: ServiceItem
   /** Urutan Ibadah is empty — activeItem is only a placeholder */
   isEmpty: boolean
+  runningText: RunningText | null
+  onRunningText: (rt: RunningText | null) => void
+  /** Display 1 chroma key colour (null = off) and subtitle mode; the preview mirrors Display 1 */
+  chromaKey: string | null
+  subtitle: boolean
   liveBackground: SlideBackground
   liveTextStyle: TextStyle
   liveMediaUrl?: string
@@ -34,7 +40,7 @@ export function RightPanel(props: Props) {
   const {
     activeItem, liveBackground, liveTextStyle, liveSlide,
     liveMediaUrl, liveMediaType,
-    onUpdateBackground, onUpdateTextStyle, isEmpty,
+    onUpdateBackground, onUpdateTextStyle, isEmpty, runningText, onRunningText, chromaKey, subtitle,
     ...panelProps
   } = props
 
@@ -75,6 +81,9 @@ export function RightPanel(props: Props) {
             textStyle={liveTextStyle}
             liveMediaUrl={liveMediaUrl}
             liveMediaType={liveMediaType}
+            runningText={runningText}
+            chromaKey={chromaKey}
+            subtitle={subtitle}
           />
         </div>
       </div>
@@ -122,7 +131,7 @@ export function RightPanel(props: Props) {
             />
           )}
           {tab === 'studio' && (
-            <StudioPanel liveSlide={liveSlide} />
+            <StudioPanel liveSlide={liveSlide} runningText={runningText} onRunningText={onRunningText} />
           )}
         </div>
       </div>

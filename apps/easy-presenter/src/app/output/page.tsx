@@ -3,11 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { SlideCanvas } from '@/components/shared/SlideCanvas'
 import { textSettingsToStyle } from '@/components/settings/appSettings'
+import { RunningTextOverlay } from '@/components/shared/RunningTextOverlay'
 import { openOutputChannel, type OutputMessage, type OutputState } from '@/lib/outputBus'
 import { setLowSpec } from '@/lib/perfMode'
 import type { SlideBackground, TextStyle } from '@/components/types'
-
-interface LowerThird { name: string; title: string }
 
 const VIDEO_DRIFT = 0.5  // seconds before re-syncing to the operator's master player
 
@@ -32,7 +31,6 @@ function SyncedVideo({ url, video }: { url: string; video: NonNullable<OutputSta
 export default function OutputPage() {
   const [display, setDisplay] = useState<1 | 2>(1)
   const [state, setState]     = useState<OutputState | null>(null)
-  const [lowerThird, setLowerThird] = useState<LowerThird | null>(null)
   const [size, setSize] = useState({ w: 1920, h: 1080 })
 
   useEffect(() => {
@@ -49,17 +47,10 @@ export default function OutputPage() {
       ch.postMessage({ type: 'request-state' } satisfies OutputMessage)
     }
 
-    // Lower thirds from the Studio panel (Electron IPC)
-    const cleanup = window.electronAPI?.onSlideCommand(data => {
-      const cmd = data as { type: string; name?: string; title?: string }
-      if (cmd.type === 'lower-third') setLowerThird({ name: cmd.name ?? '', title: cmd.title ?? '' })
-      else if (cmd.type === 'clear') setLowerThird(null)
-    })
-
     const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight })
     onResize()
     window.addEventListener('resize', onResize)
-    return () => { ch?.close(); cleanup?.(); window.removeEventListener('resize', onResize) }
+    return () => { ch?.close(); window.removeEventListener('resize', onResize) }
   }, [])
 
   // Fit a 16:9 frame inside the window
@@ -75,9 +66,15 @@ export default function OutputPage() {
     else if (state.itemType === 'scripture') background = state.display2.scriptureBackground
   }
 
+  // Chroma key (ATEM): the key colour replaces every background so only the text stays
+  const key = state?.key[`display${display}`]
+  const idle = key?.color ?? '#000000'
+  if (key?.color) background = { type: 'solid', color: key.color }
+  if (key?.subtitle && textStyle) textStyle = { ...textStyle, verticalPosition: 'bottom' }
+
   return (
-    <div className="w-screen h-screen bg-black flex items-center justify-center overflow-hidden" style={{ cursor: 'none' }}>
-      <div className="relative overflow-hidden" style={{ width: boxW, height: boxH, background: '#000' }}>
+    <div className="w-screen h-screen flex items-center justify-center overflow-hidden" style={{ cursor: 'none', background: idle }}>
+      <div className="relative overflow-hidden" style={{ width: boxW, height: boxH, background: idle }}>
         {state && !state.blank && (
           state.media ? (
             state.media.type === 'video' && state.video ? (
@@ -101,13 +98,7 @@ export default function OutputPage() {
           ) : null
         )}
 
-        {lowerThird && (
-          <div className="absolute left-[5%] bottom-[8%] px-[2%] py-[1%] rounded"
-            style={{ background: 'rgba(15,23,42,0.85)', borderLeft: `${boxW * 0.004}px solid #3b82f6`, zIndex: 20 }}>
-            <div style={{ color: '#fff', fontSize: boxW * 0.022, fontWeight: 700 }}>{lowerThird.name}</div>
-            {lowerThird.title && <div style={{ color: '#cbd5e1', fontSize: boxW * 0.014 }}>{lowerThird.title}</div>}
-          </div>
-        )}
+        {state?.runningText && <RunningTextOverlay runningText={state.runningText} width={boxW} />}
       </div>
     </div>
   )

@@ -17,9 +17,9 @@ declare global {
   }
 
   interface ElectronAPI {
-    sendSlideCommand: (data: unknown) => void
-    onSlideCommand: (cb: (data: unknown) => void) => () => void
     getDisplays: () => Promise<NativeDisplay[]>
+    /** Monitor plugged / unplugged; returns an unsubscribe function */
+    onDisplaysChanged?: (cb: () => void) => () => void
     /** Persist native settings (read at startup) and (re)open output windows */
     applyNativeSettings?: (s: NativeSettings) => Promise<void>
     /** GPU feature status from Chromium */

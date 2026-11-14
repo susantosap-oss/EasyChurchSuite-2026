@@ -26,9 +26,25 @@ export interface DisplaySettings {
  */
 export type Display2Mode = 'custom' | 'mirror'
 
+/**
+ * Chroma key for a video switcher (ATEM): every background on that output (song, scripture,
+ * blank, around media) becomes the key colour, so the keyer lays only the text over the camera.
+ */
+export type ChromaKey = 'off' | 'green' | 'blue'
+
+export const CHROMA_COLORS: Record<Exclude<ChromaKey, 'off'>, string> = { green: '#00FF00', blue: '#0000FF' }
+
 export interface OutputTarget {
   enabled: boolean
   displayId: number | null   // Electron display id; null = auto (first secondary screen)
+  chromaKey: ChromaKey
+  /** Force text to the bottom of the frame (lyrics / verses as subtitles over the camera) */
+  subtitle: boolean
+}
+
+/** Key colour for an output, or null when chroma key is off */
+export function chromaColor(t: OutputTarget): string | null {
+  return t.chromaKey === 'off' ? null : CHROMA_COLORS[t.chromaKey]
 }
 
 export interface VideoLimits {
@@ -44,6 +60,8 @@ export interface AppSettings {
   display2: DisplaySettings
   /** Default text animation per song group on Display 1 (null = none) */
   animations: { verse: TextAnimation | null; chorus: TextAnimation | null; bridge: TextAnimation | null }
+  /** Bible verses on the output: prefix the reference, e.g. "Yoh 3:16 : Karena begitu besar…" */
+  scripture: { showReference: boolean }
   output: {
     display1: OutputTarget
     display2: OutputTarget & { mode: Display2Mode }
@@ -78,9 +96,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     scriptureBackground: { type: 'solid', color: '#000000' },
   },
   animations: { verse: null, chorus: null, bridge: null },
+  scripture: { showReference: true },
   output: {
-    display1: { enabled: true, displayId: null },
-    display2: { enabled: false, displayId: null, mode: 'custom' },
+    display1: { enabled: true, displayId: null, chromaKey: 'off', subtitle: false },
+    display2: { enabled: false, displayId: null, mode: 'custom', chromaKey: 'off', subtitle: false },
   },
   performance: {
     hardwareAcceleration: true, gpuRasterization: true, maxMemoryMB: 4096, lowSpecMode: false,
@@ -100,6 +119,7 @@ export function normalizeSettings(raw: Partial<AppSettings> | null | undefined):
     display1: disp(r.display1, d.display1),
     display2: disp(r.display2, d.display2),
     animations: { ...d.animations, ...r.animations },
+    scripture: { ...d.scripture, ...r.scripture },
     output: {
       display1: { ...d.output.display1, ...r.output?.display1 },
       display2: { ...d.output.display2, ...r.output?.display2 },

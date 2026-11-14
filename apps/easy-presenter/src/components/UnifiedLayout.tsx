@@ -3,15 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { TopBar } from './TopBar'
 import { StatusBar } from './StatusBar'
+import { SecondScreenNotice } from './SecondScreenNotice'
 import { LeftPanel } from './left/LeftPanel'
 import { CenterPanel } from './center/CenterPanel'
 import { RightPanel } from './right/RightPanel'
 import { SlideEditModal } from './center/SlideEditModal'
 import { useBgLibrary } from './center/BackgroundPanels'
 import { useAppSettings } from './settings/useAppSettings'
-import { applyAppDefaults, defaultTextStyle } from './settings/appSettings'
+import { applyAppDefaults, defaultTextStyle, chromaColor } from './settings/appSettings'
 import { SettingsModal } from './settings/SettingsModal'
-import { openOutputChannel, type OutputMessage, type OutputState } from '@/lib/outputBus'
+import { openOutputChannel, type OutputMessage, type OutputState, type RunningText } from '@/lib/outputBus'
 import type { ServiceItem, SlideBackground, TextStyle, Slide } from './types'
 import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextStyle, pickedBackground } from './types'
 import type { SceneRef } from './left/SaveSceneModal'
@@ -39,6 +40,7 @@ export function UnifiedLayout() {
   const [isClearText, setIsClearText]     = useState(false)
   const [isLive, setIsLive]               = useState(false)
   const [quickSlide, setQuickSlide]       = useState<QuickSlide | null>(null)
+  const [runningText, setRunningText]     = useState<RunningText | null>(null)
   const [editSlideId, setEditSlideId]     = useState<string | null>(null)
   const bgLibrary                         = useBgLibrary()
   const { settings: appSettings, save: saveAppSettings } = useAppSettings()
@@ -54,9 +56,15 @@ export function UnifiedLayout() {
   const liveItem    = items.find(i => i.slides.some(s => s.id === liveSlideId)) ?? null
 
   const baseLiveSlide = isLive && !isBlank ? (liveSlide ?? activeSlide) : null
+  const liveIsScripture = quickSlide != null || (liveItem ?? activeItem).type === 'scripture'
+  // Scripture on the output: "Yoh 3:16 : <verse>" (Settings ⚙ → Teks → Ayat Alkitab)
+  const withReference = (s: Slide): Slide =>
+    liveIsScripture && appSettings.scripture.showReference && s.label && s.text
+      ? { ...s, text: `${s.label} : ${s.text}` }
+      : s
   const effectiveLiveSlide: Slide | null = quickSlide
-    ? { id: '__quick__', label: quickSlide.label, text: quickSlide.text }
-    : (isClearText && baseLiveSlide ? { ...baseLiveSlide, text: '' } : baseLiveSlide)
+    ? withReference({ id: '__quick__', label: quickSlide.label, text: quickSlide.text })
+    : (isClearText && baseLiveSlide ? { ...baseLiveSlide, text: '' } : baseLiveSlide && withReference(baseLiveSlide))
 
   const quickItem = items.find(i => i.id === '__quick__')
 
@@ -108,6 +116,11 @@ export function UnifiedLayout() {
     video: liveMediaType === 'video' && mediaStatus.url === liveMediaUrl
       ? { playing: mediaControl.playing && !mediaStatus.ended, currentTime: mediaStatus.currentTime, loop: mediaControl.loop }
       : null,
+    runningText,
+    key: {
+      display1: { color: chromaColor(appSettings.output.display1), subtitle: appSettings.output.display1.subtitle },
+      display2: { color: chromaColor(appSettings.output.display2), subtitle: appSettings.output.display2.subtitle },
+    },
     display2: appSettings.display2,
     display2Mode: appSettings.output.display2.mode,
     lowSpec: appSettings.performance.lowSpecMode,
@@ -394,6 +407,8 @@ ${name}` }],
         onOpenSettings={() => setShowSettings(true)}
       />
 
+      <SecondScreenNotice enabled={appSettings.output.display1.enabled} />
+
       <div className="flex flex-1 overflow-hidden">
         <LeftPanel
           service={items}
@@ -446,6 +461,10 @@ ${name}` }],
 
         <RightPanel
           isEmpty={isEmpty}
+          runningText={runningText}
+          onRunningText={setRunningText}
+          chromaKey={chromaColor(appSettings.output.display1)}
+          subtitle={appSettings.output.display1.subtitle}
           liveSlide={effectiveLiveSlide}
           isBlank={isBlank}
           isLive={isLive}

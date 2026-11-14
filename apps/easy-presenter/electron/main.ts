@@ -269,11 +269,6 @@ async function listDisplays() {
 
 // ── IPC ──
 
-// Relay studio commands (lower thirds) from operator → every output window
-ipcMain.on('slide:command', (_event, data) => {
-  outputWindows.forEach(w => w.webContents.send('slide:command', data))
-})
-
 ipcMain.handle('app:get-displays', () => listDisplays())
 
 ipcMain.handle('settings:apply-native', (_event, s: NativeSettings) => {
@@ -311,7 +306,11 @@ Log: ${join(app.getPath('userData'), 'server.log')}`)
   applyOutputs(native)
 
   // Monitor plugged / unplugged → re-place output windows
-  const replace = () => { connectorCache = null; applyOutputs(native) }
+  const replace = () => {
+    connectorCache = null
+    applyOutputs(native)
+    operatorWindow?.webContents.send('displays:changed')
+  }
   screen.on('display-added', replace)
   screen.on('display-removed', replace)
 

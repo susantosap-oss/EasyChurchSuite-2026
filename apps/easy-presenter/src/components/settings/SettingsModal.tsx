@@ -152,7 +152,8 @@ export function SettingsModal({ settings, bgLibrary, currentScene, onSave, onCre
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {tab === 'teks' && <TextTab draft={draft} patchText={patchText} />}
+            {tab === 'teks' && <TextTab draft={draft} patchText={patchText}
+              setShowReference={v => setDraft(d => ({ ...d, scripture: { ...d.scripture, showReference: v } }))} />}
             {tab === 'background' && <BackgroundTab draft={draft} lib={bgLibrary} patchDisplay={patchDisplay} />}
             {tab === 'animasi' && <AnimationTab draft={draft} setDraft={setDraft} />}
             {tab === 'scene' && <SceneTab currentScene={currentScene} onCreateScene={onCreateScene} onDone={onClose} />}
@@ -180,7 +181,11 @@ export function SettingsModal({ settings, bgLibrary, currentScene, onSave, onCre
 
 // ── 1. Teks ──
 
-function TextTab({ draft, patchText }: { draft: AppSettings; patchText: (n: 1 | 2, p: Partial<DisplayTextSettings>) => void }) {
+function TextTab({ draft, patchText, setShowReference }: {
+  draft: AppSettings
+  patchText: (n: 1 | 2, p: Partial<DisplayTextSettings>) => void
+  setShowReference: (v: boolean) => void
+}) {
   const [fontFor, setFontFor] = useState<1 | 2 | null>(null)
   const positions: { id: TextPosition; label: string }[] = [
     { id: 'top', label: 'Atas' }, { id: 'center', label: 'Tengah' }, { id: 'bottom', label: 'Bawah' },
@@ -231,6 +236,9 @@ function TextTab({ draft, patchText }: { draft: AppSettings; patchText: (n: 1 | 
           )
         })}
       </div>
+      <Section title="Ayat Alkitab" note="Referensi ditampilkan di depan teks ayat pada output, contoh: Yoh 3:16 : Karena begitu besar kasih Allah…">
+        <Toggle on={draft.scripture.showReference} onChange={setShowReference} label="Tampilkan kitab, pasal & ayat" />
+      </Section>
       {fontFor && (
         <FontPickerModal currentFont={draft[`display${fontFor}`].text.fontFamily}
           onSelect={f => patchText(fontFor, { fontFamily: f })} onClose={() => setFontFor(null)} />
@@ -433,6 +441,22 @@ function OutputTab({ draft, setDraft }: { draft: AppSettings; setDraft: React.Di
                 style={{ background: '#1e2535', border: `1px solid ${C.border}`, color: '#e2e8f0' }}>
                 {options.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
+            </div>
+            <div>
+              <p className="text-[10px] mb-1" style={{ color: C.muted }}>Chroma Key (untuk ATEM / video switcher)</p>
+              <Seg value={t.chromaKey}
+                options={[{ id: 'off', label: 'Off (proyektor)' }, { id: 'green', label: 'Hijau' }, { id: 'blue', label: 'Biru' }]}
+                onChange={v => setTarget(n, { chromaKey: v })} />
+              {t.chromaKey !== 'off' && (
+                <div className="mt-2 space-y-2">
+                  <Toggle on={t.subtitle} onChange={v => setTarget(n, { subtitle: v })} label="Teks model subtitle (selalu di bawah)" />
+                  <p className="text-[10px]" style={{ color: C.dim }}>
+                    Semua background lagu, ayat, Blank dan area kosong di sekitar media menjadi {t.chromaKey === 'green' ? 'hijau' : 'biru'} —
+                    samakan dengan warna key di ATEM. Di ATEM: program tetap di kamera, input PC dipasang sebagai
+                    Upstream Key → Chroma, lalu KEY ON AIR. Gambar & video media tetap menutupi kamera.
+                  </p>
+                </div>
+              )}
             </div>
             {n === 2 && (
               <div>

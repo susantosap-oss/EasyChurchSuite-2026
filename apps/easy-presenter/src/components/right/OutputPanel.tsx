@@ -3,6 +3,11 @@
 import { SlideCanvas } from '../shared/SlideCanvas'
 import type { Slide, SlideBackground, TextStyle, MediaControl, MediaStatus } from '../types'
 import { OutputVideo } from './OutputVideo'
+import { RunningTextOverlay } from '../shared/RunningTextOverlay'
+import type { RunningText } from '@/lib/outputBus'
+
+/** Inner width of the 16:9 preview (300px panel − padding − border) */
+const PREVIEW_W = 276
 
 interface Props {
   liveSlide: Slide | null
@@ -12,6 +17,10 @@ interface Props {
   textStyle: TextStyle
   liveMediaUrl?: string
   liveMediaType?: 'image' | 'video' | 'pdf'
+  runningText: RunningText | null
+  /** Display 1 chroma key colour (null = off) */
+  chromaKey: string | null
+  subtitle: boolean
   mediaControl: MediaControl
   onMediaStatus: (status: MediaStatus) => void
   onNext: () => void
@@ -22,10 +31,14 @@ interface Props {
 
 export function OutputPanel({
   liveSlide, isBlank, isLive, background, textStyle,
-  liveMediaUrl, liveMediaType, mediaControl, onMediaStatus,
+  liveMediaUrl, liveMediaType, runningText, chromaKey, subtitle, mediaControl, onMediaStatus,
   onNext, onPrev, onBlank, onGoLive,
 }: Props) {
   const showMedia = isLive && !isBlank && liveMediaUrl && liveMediaType
+  const idleColor = chromaKey ?? '#000'
+  // Mirror what Display 1 sends: key colour instead of the slide background, text at the bottom
+  const bg: SlideBackground = chromaKey ? { type: 'solid', color: chromaKey } : background
+  const style: TextStyle = subtitle ? { ...textStyle, verticalPosition: 'bottom' } : textStyle
 
   return (
     <div className="flex flex-col flex-shrink-0">
@@ -35,14 +48,14 @@ export function OutputPanel({
           className="relative w-full overflow-hidden rounded-lg"
           style={{
             paddingTop: '56.25%',
-            background: '#000',
+            background: idleColor,
             border:     isLive && !isBlank ? '2px solid #dc2626' : '2px solid #2a3347',
             boxShadow:  isLive && !isBlank ? '0 0 16px rgba(220,38,38,0.2)' : 'none',
           }}
         >
           <div className="absolute inset-0 overflow-hidden">
             {isBlank ? (
-              <div className="w-full h-full bg-black flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center" style={{ background: idleColor }}>
                 <span className="text-xs" style={{ color: '#374151' }}>BLANK</span>
               </div>
             ) : showMedia && liveMediaType === 'image' ? (
@@ -60,17 +73,18 @@ export function OutputPanel({
             ) : liveSlide ? (
               <SlideCanvas
                 text={liveSlide.text}
-                background={background}
-                textStyle={textStyle}
+                background={bg}
+                textStyle={style}
                 containerWidth={260}
                 animate
                 image={liveSlide.image}
               />
             ) : (
-              <div className="w-full h-full bg-black flex items-center justify-center">
+              <div className="w-full h-full flex items-center justify-center" style={{ background: idleColor }}>
                 <span className="text-[10px]" style={{ color: '#1f2937' }}>Belum ada output</span>
               </div>
             )}
+            {runningText && <RunningTextOverlay runningText={runningText} width={PREVIEW_W} />}
           </div>
 
           {/* Live dot indicator */}

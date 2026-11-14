@@ -6,6 +6,7 @@ import { pipeline } from 'stream/promises'
 import { mediaDir, mediaKind, mediaFileUrl, displayName, isPlayable } from './shared'
 import { resolveFfmpeg, probeVideo, conversionReasons, enqueueConversion, jobFor } from '@/lib/ffmpeg.server'
 import { getServerSettings } from '@/lib/settings.server'
+import { enqueueOfficeConversion } from '@/lib/office.server'
 
 const describe = (file: string, size: number) => ({
   file, name: displayName(file), kind: mediaKind(file), size, url: mediaFileUrl(file),
@@ -46,6 +47,9 @@ export async function POST(req: NextRequest) {
     await pipeline(Readable.fromWeb(req.body as import('stream/web').ReadableStream), createWriteStream(path))
     const size = statSync(path).size
     let note: string | null = null
+
+    // Presentations become PDFs (PowerPoint / LibreOffice) and then work like any uploaded PDF
+    if (mediaKind(stored) === 'ppt') enqueueOfficeConversion(dir, stored)
 
     // Videos above the playback limits are converted to H.264 MP4 in the background
     if (mediaKind(stored) === 'video') {

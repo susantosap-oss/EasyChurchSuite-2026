@@ -6,7 +6,7 @@ import { StatusBar } from './StatusBar'
 import { SecondScreenNotice } from './SecondScreenNotice'
 import { RemoteModal } from './RemoteModal'
 import { ITEM_KIND, type RemoteCommand, type RemoteSnapshot } from '@/lib/remote'
-import { useSpeakerDecks, type SpeakerDeck } from '@/lib/speakerDecks'
+import { useSpeakerDecks, markSpeakerDeck, type SpeakerDeck } from '@/lib/speakerDecks'
 import { convertPdfToSlides } from '@/lib/pdfToSlides'
 import { LeftPanel } from './left/LeftPanel'
 import { CenterPanel } from './center/CenterPanel'
@@ -60,6 +60,18 @@ export function UnifiedLayout() {
   const [showRemote, setShowRemote]       = useState(false)
   const [remoteClients, setRemoteClients] = useState<RemoteInfo['clients']>({ operator: 0, speaker: 0 })
   const speakerDecks                      = useSpeakerDecks()
+  // A marked PDF without pages (a ✓ Speaker PPTX that was converted to PDF): render its pages once
+  const deckRendering = useRef(new Set<string>())
+  useEffect(() => {
+    const deck = speakerDecks.find(d => d.kind === 'pdf' && !d.pages.length && !deckRendering.current.has(d.file))
+    if (!deck) return
+    deckRendering.current.add(deck.file)
+    void (async () => {
+      const blob  = await fetch(deck.url).then(r => r.blob())
+      const pages = await convertPdfToSlides(new File([blob], `${deck.name}.pdf`, { type: 'application/pdf' }))
+      if (pages.length && pages.every(p => p.startsWith('/api/'))) await markSpeakerDeck({ ...deck, pages })
+    })().catch(() => { /* stays without pages; retried on the next launch */ })
+  }, [speakerDecks])
   const [editSlideId, setEditSlideId]     = useState<string | null>(null)
   const bgLibrary                         = useBgLibrary()
   const { settings: appSettings, save: saveAppSettings } = useAppSettings()
@@ -489,7 +501,9 @@ ${name}` }],
     activeSlideId: activeSlide.id,
     liveSlideId,
     runningText: runningText?.text ?? null,
-    decks: speakerDecks.map(d => ({ id: d.file, name: d.name, kind: d.kind, pages: d.pages.length ? d.pages : [d.url] })),
+    decks: speakerDecks
+      .filter(d => d.kind !== 'pdf' || d.pages.length)   // a PDF waits until its pages are rendered
+      .map(d => ({ id: d.file, name: d.name, kind: d.kind, pages: d.pages.length ? d.pages : [d.url] })),
     liveDeck: isLive && liveItem?.id.startsWith(DECK_PREFIX)
       ? { id: liveItem.id.slice(DECK_PREFIX.length), page: Math.max(0, liveItem.slides.findIndex(s => s.id === liveSlideId)) }
       : null,

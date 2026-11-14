@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { convertPdfToSlides } from '@/lib/pdfToSlides'
-import { useSpeakerDecks, markSpeakerDeck, unmarkSpeakerDeck } from '@/lib/speakerDecks'
+import { useSpeakerDecks, markSpeakerDeck, unmarkSpeakerDeck, reloadSpeakerDecks } from '@/lib/speakerDecks'
 
 export interface MediaFile {
   id: string
@@ -89,6 +89,12 @@ async function fetchList(): Promise<MediaFile[]> {
 
 function statusText(file: MediaFile): string | null {
   const job = file.job
+  if (file.mediaType === 'ppt') {
+    if (job?.state === 'queued') return 'Antre konversi ke PDF…'
+    if (job?.state === 'converting') return `Konversi ke PDF…${job.encoder ? ` (${job.encoder})` : ''}`
+    if (job?.state === 'error') return `Gagal ke PDF: ${job.error ?? ''}`
+    return 'Klik → PDF agar bisa ditampilkan'
+  }
   if (job?.state === 'queued') return 'Antre konversi video…'
   if (job?.state === 'converting') {
     const enc = job.encoder ? ` · ${job.encoder.replace('h264_', '').toUpperCase()}` : ''
@@ -128,7 +134,10 @@ export function MediaLibrary({ onAdd }: Props) {
         const byFile = new Map((d.jobs ?? []).map(j => [j.file, j]))
         const finished = (d.jobs ?? []).some(j => (j.state === 'done' || j.state === 'error') &&
           files.some(f => f.id === j.file && isBusy(f)))
-        if (finished) setFiles(await fetchList())
+        if (finished) {
+          setFiles(await fetchList())
+          void reloadSpeakerDecks().catch(() => {})   // a converted presentation keeps its ✓ Speaker on the PDF
+        }
         else setFiles(prev => prev.map(f => (byFile.has(f.id) ? { ...f, job: byFile.get(f.id)! } : f)))
       } catch { /* retry next tick */ }
     }, 1500)
@@ -220,6 +229,21 @@ export function MediaLibrary({ onAdd }: Props) {
       await markSpeakerDeck({ file: file.id, name: file.name.replace(/\.pdf$/i, ''), kind, url: file.url, pages })
     } catch (err) {
       setError(`Gagal menandai untuk Speaker: ${err instanceof Error ? err.message : 'error'}`)
+    }
+  }
+
+  // PPTX / PPT → PDF on this PC (retry after installing LibreOffice / activating PowerPoint)
+  const convertToPdf = async (file: MediaFile) => {
+    setError('')
+    try {
+      const res  = await fetch('/api/media/convert/', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: file.id }),
+      })
+      const data = await res.json() as { job?: ConvertJob; error?: string }
+      if (!res.ok || !data.job) throw new Error(data.error ?? `HTTP ${res.status}`)
+      setFiles(prev => prev.map(f => (f.id === file.id ? { ...f, job: data.job! } : f)))
+    } catch (err) {
+      setError(`Gagal memulai konversi: ${err instanceof Error ? err.message : 'error'}`)
     }
   }
 
@@ -322,9 +346,7 @@ export function MediaLibrary({ onAdd }: Props) {
                   style={{ color: conv || busy ? '#fbbf24' : file.job?.state === 'error' ? '#fca5a5' : '#64748b' }}>
                   {conv
                     ? `Mengonversi halaman ${conv.done}/${conv.total || '…'}`
-                    : status ?? (file.mediaType === 'ppt'
-                      ? 'Simpan sebagai PDF dulu di PowerPoint'
-                      : `${TYPE_LABELS[file.mediaType]} · ${formatSize(file.size)}`)}
+                    : status ?? `${TYPE_LABELS[file.mediaType]} · ${formatSize(file.size)}`}
                 </div>
                 {!blocked && (
                   <button
@@ -352,7 +374,17 @@ export function MediaLibrary({ onAdd }: Props) {
 
               {/* Actions */}
               <div className={`gap-1 flex-shrink-0 ${conv || confirming ? 'flex' : 'hidden group-hover:flex'}`}>
-                {!confirming && (
+                {!confirming && file.mediaType === 'ppt' && !busy && (
+                  <button
+                    onClick={() => void convertToPdf(file)}
+                    title="Ubah ke PDF dengan PowerPoint / LibreOffice di PC ini"
+                    className="text-[9px] px-2 py-1 rounded"
+                    style={{ background: '#1d4ed8', color: 'white' }}
+                  >
+                    → PDF
+                  </button>
+                )}
+                {!confirming && file.mediaType !== 'ppt' && (
                   <button
                     onClick={() => handleAdd(file)}
                     disabled={!!pdfConv || blocked}

@@ -302,6 +302,7 @@ function fitLive() {
 /* What the preview shows: a chosen page (not live yet), else the page after the live one */
 function previewTarget() {
   var ld = S && S.liveDeck;
+  if (!sel && !ld && S && S.decks && S.decks.length) sel = { id: S.decks[0].id, page: 0 };
   if (sel && deckById(sel.id) && (!ld || sel.id !== ld.id)) return { deck: deckById(sel.id), page: sel.page, mode: 'sel' };
   if (ld && deckById(ld.id)) return { deck: deckById(ld.id), page: ld.page + 1, mode: 'live' };
   return null;
@@ -339,6 +340,7 @@ function renderSpeaker() {
   $('sn').disabled = !canStep || (pt.mode === 'sel' ? pt.page >= pt.deck.pages.length - 1 : pt.page >= pt.deck.pages.length);
   sl.disabled = !pt || pt.mode !== 'sel';
   sl.textContent = pt && pt.mode === 'live' ? '● LIVE' : '● Live';
+  $('sh').textContent = pt ? '' : (S && S.decks && S.decks.length ? 'Pilih presentasi di bawah' : 'Belum ada presentasi — minta Operator mencentang ✓ Speaker di Media');
   sl.className = 'btn go' + (pt && pt.mode === 'live' ? ' on' : '');
 
   var list = $('dl'); list.textContent = '';
@@ -439,6 +441,7 @@ const SPEAKER_BODY = `
 </div><div class="colB">
 <div class="pvw"><div><div class="cap"><span>PREVIEW</span><span id="pvc"></span></div><div class="scr" id="pvs"></div></div><div class="info" id="pvi"></div></div>
 <div class="row r3" style="margin:10px 12px 0"><button class="btn" id="sp">◄ Prev</button><button class="btn go" id="sl">● Live</button><button class="btn" id="sn">Next ►</button></div>
+<div class="note" id="sh" style="margin:6px 14px 0;color:#f59e0b"></div>
 <div class="decks" id="dl"></div>
 </div></div>
 `

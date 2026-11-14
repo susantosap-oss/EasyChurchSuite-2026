@@ -20,6 +20,7 @@
     "@easychurch/sync": "workspace:*",
     "better-sqlite3": "^12.11.1",
     "electron-squirrel-startup": "^1.0.1",
+    "jszip": "3.10.1",
     "next": "14.2.18",
     "pdfjs-dist": "3.11.174",
     "qrcode": "1.5.4",

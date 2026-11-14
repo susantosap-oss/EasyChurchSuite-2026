@@ -100,6 +100,9 @@ console.log(`  better_sqlite3.node replaced: ${nativeModules.length}`)
 fs.cpSync(path.join(vendor, 'ffmpeg'), path.join(stage, 'ffmpeg'), { recursive: true })
 fs.cpSync(path.join(vendor, 'seed'), path.join(stage, 'seed'), { recursive: true })
 fs.cpSync(path.join(root, 'dist-electron'), path.join(stage, 'dist-electron'), { recursive: true })
+// Icon for the phone remote page (home-screen icon), read by the main process
+fs.mkdirSync(path.join(stage, 'assets'), { recursive: true })
+fs.copyFileSync(path.join(root, 'build/icon.png'), path.join(stage, 'assets/icon.png'))
 fs.writeFileSync(path.join(stage, 'package.json'), JSON.stringify({
   name: 'easychurch-suite',
   productName: 'EasyChurch Suite',
@@ -118,7 +121,7 @@ const config = {
   electronVersion,
   electronDist: path.join(root, 'node_modules/electron/dist'),
   directories: { app: stage, output: release },
-  files: ['dist-electron/**/*', 'package.json'],
+  files: ['dist-electron/**/*', 'assets/**/*', 'package.json'],
   extraResources: ['server', 'ffmpeg', 'seed'].map(d => ({ from: path.join(stage, d), to: d, filter: ['**/*'] })),
   npmRebuild: false,
   win: { target: [{ target: 'nsis', arch: ['x64'] }], icon },

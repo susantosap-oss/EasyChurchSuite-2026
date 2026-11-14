@@ -17,12 +17,15 @@ interface Props {
   onGoLive: () => void
   onBlank: () => void
   service: ServiceItem[]
-  onQuickLaunch: (text: string, label: string) => void
+  onQuickLaunch: (text: string, label: string, version?: string) => void
   onGotoItem: (itemId: string) => void
   onOpenSettings: () => void
+  onOpenRemote: () => void
+  /** Phones connected to the remote */
+  remoteCount: number
 }
 
-export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLaunch, onGotoItem, onOpenSettings }: Props) {
+export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLaunch, onGotoItem, onOpenSettings, onOpenRemote, remoteCount }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<QuickResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -191,6 +194,21 @@ export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLau
       </div>
 
       <div className="flex-1" />
+
+      {/* Phone remote */}
+      <button onClick={onOpenRemote} title="Remote HP (Operator / Speaker)"
+        className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 transition-colors"
+        style={{ background: '#1e2535', border: '1px solid #2a3347' }}>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect x="7" y="2" width="10" height="20" rx="2" strokeWidth={2} />
+          <path strokeLinecap="round" strokeWidth={2} d="M11 18h2" />
+        </svg>
+        Remote
+        {remoteCount > 0 && (
+          <span className="min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+            style={{ background: '#16a34a', color: '#fff' }}>{remoteCount}</span>
+        )}
+      </button>
 
       {/* Settings */}
       <button onClick={onOpenSettings} title="Settings"

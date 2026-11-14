@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, creat
 import { execFile, spawn, type ChildProcess } from 'child_process'
 import http from 'http'
 import net from 'net'
+import { RemoteServer } from './remote'
 
 // One running instance only — a second copy would start a second server on the same data
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -279,6 +280,39 @@ ipcMain.handle('settings:apply-native', (_event, s: NativeSettings) => {
 
 ipcMain.handle('app:gpu-info', () => app.getGPUFeatureStatus() as unknown as Record<string, string>)
 
+// ── Phone remote (Operator / Speaker) ──
+
+let remote: RemoteServer | null = null
+// The operator may send its first state before the remote server is listening
+let lastRemoteState = '{}'
+
+function startRemote() {
+  // build/icon.png in dev; copied next to dist-electron as assets/icon.png in the installed app
+  const iconPath = join(__dirname, app.isPackaged ? '../assets/icon.png' : '../build/icon.png')
+  remote = new RemoteServer(
+    join(app.getPath('userData'), 'remote.json'),
+    existsSync(iconPath) ? readFileSync(iconPath) : null,
+    cmd => operatorWindow?.webContents.send('remote:command', cmd),
+    clients => operatorWindow?.webContents.send('remote:clients', clients),
+    path => new Promise((resolve, reject) => {
+      http.get(baseUrl + path, res => {
+        let body = ''
+        res.setEncoding('utf8')
+        res.on('data', chunk => { body += chunk })
+        res.on('end', () => resolve(body))
+      }).on('error', reject)
+    }),
+  )
+  remote.start().then(() => remote?.setSnapshot(lastRemoteState)).catch(() => { remote = null })
+}
+
+ipcMain.on('remote:state', (_event, json: string) => {
+  lastRemoteState = json
+  remote?.setSnapshot(json)
+})
+ipcMain.handle('remote:info', () => remote?.info() ?? null)
+ipcMain.handle('remote:regenerate', () => remote?.regenerateKeys() ?? null)
+
 ipcMain.on('app:relaunch', () => {
   app.relaunch()
   app.exit(0)
@@ -304,6 +338,7 @@ Log: ${join(app.getPath('userData'), 'server.log')}`)
     }
   }
   applyOutputs(native)
+  startRemote()
 
   // Monitor plugged / unplugged → re-place output windows
   const replace = () => {
@@ -319,7 +354,7 @@ Log: ${join(app.getPath('userData'), 'server.log')}`)
   })
 })
 
-app.on('will-quit', () => { serverProcess?.kill() })
+app.on('will-quit', () => { serverProcess?.kill(); remote?.stop() })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

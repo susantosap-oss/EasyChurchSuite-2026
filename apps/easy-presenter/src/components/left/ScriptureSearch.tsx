@@ -12,7 +12,7 @@ export interface ScriptureAddPayload {
 
 interface Props {
   onAdd: (payload: ScriptureAddPayload) => void
-  onQuickLaunch: (text: string, label: string) => void
+  onQuickLaunch: (text: string, label: string, version?: string) => void
 }
 
 type View = 'books' | 'chapters' | 'verses'
@@ -95,7 +95,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
         if (!v) return
         const abbr  = bookAbbr || (selectedBook?.nameAbbr ?? '')
         const label = `${abbr} ${selectedChapter}:${v.verseNumber}`
-        onQuickLaunch(v.text, label)
+        onQuickLaunch(v.text, label, version)
       }
 
       if (e.key === 'ArrowDown') {
@@ -120,7 +120,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
         if (!v) return
         const abbr  = bookAbbr || (selectedBook?.nameAbbr ?? '')
         const label = `${abbr} ${selectedChapter}:${v.verseNumber}`
-        onQuickLaunch(v.text, label)
+        onQuickLaunch(v.text, label, version)
       }
     }
     window.addEventListener('keydown', handler)
@@ -350,7 +350,8 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
               onSelect={() => setSelectedVerseIdx(idx)}
               onLive={() => onQuickLaunch(
                 v.text,
-                `${displayAbbr} ${selectedChapter}:${v.verseNumber}`
+                `${displayAbbr} ${selectedChapter}:${v.verseNumber}`,
+                version,
               )}
               onAdd={() => addVerse(v)}
             />

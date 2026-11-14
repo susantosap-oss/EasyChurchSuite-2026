@@ -25,6 +25,20 @@ declare global {
     /** GPU feature status from Chromium */
     getGpuInfo?: () => Promise<Record<string, string>>
     relaunch?: () => void
+    /** Phone remote: push the operator snapshot (JSON) to connected phones */
+    remoteSendState?: (json: string) => void
+    remoteInfo?: () => Promise<RemoteInfo | null>
+    /** New Operator / Speaker keys — old phone links stop working */
+    remoteRegenerate?: () => Promise<RemoteInfo | null>
+    onRemoteCommand?: (cb: (cmd: unknown) => void) => () => void
+    onRemoteClients?: (cb: (clients: RemoteInfo['clients']) => void) => () => void
+  }
+
+  interface RemoteInfo {
+    port: number
+    addresses: { name: string; address: string }[]
+    keys: { operator: string; speaker: string }
+    clients: { operator: number; speaker: number }
   }
 
   interface Window {

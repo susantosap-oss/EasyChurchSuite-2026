@@ -8,9 +8,12 @@ interface Props {
   slide: Slide
   liveSlideId: string | null
   isLive: boolean
+  /** Phones connected to the remote (Operator / Speaker) */
+  remotes: { operator: number; speaker: number }
+  onOpenRemote: () => void
 }
 
-export function StatusBar({ item, slide, liveSlideId, isLive }: Props) {
+export function StatusBar({ item, slide, liveSlideId, isLive, remotes, onOpenRemote }: Props) {
   const [time, setTime] = useState('')
 
   useEffect(() => {
@@ -41,10 +44,10 @@ export function StatusBar({ item, slide, liveSlideId, isLive }: Props) {
         <span>Urutan Ibadah kosong</span>
       )}
       <div className="flex-1" />
-      <div className="flex items-center gap-1.5">
-        <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#22c55e' }} />
-        <span>Sync: 0 remotes</span>
-      </div>
+      <button onClick={onOpenRemote} className="flex items-center gap-1.5 hover:text-slate-300" title="📱 Remote HP">
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: remotes.operator + remotes.speaker ? '#22c55e' : '#374151' }} />
+        <span>Remote HP: {remotes.operator} operator · {remotes.speaker} speaker</span>
+      </button>
       <span>·</span>
       {isLive ? (
         <span className="flex items-center gap-1 font-semibold" style={{ color: '#dc2626' }}>

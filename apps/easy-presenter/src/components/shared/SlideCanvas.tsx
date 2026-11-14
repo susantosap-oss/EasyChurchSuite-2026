@@ -1,10 +1,12 @@
 'use client'
 
-import type { CSSProperties } from 'react'
+import { useLayoutEffect, useRef, type CSSProperties } from 'react'
 import type { SlideBackground, TextStyle, VerticalPosition } from '../types'
 import { AnimatedText, hasTextAnimation } from './AnimatedText'
 
 const DESIGN_WIDTH = 1920
+/** Auto-fit never shrinks text below this share of the chosen font size */
+const MIN_FIT = 0.4
 
 function verticalStyle(pos: VerticalPosition, offsetPx: number): CSSProperties {
   const off = `${offsetPx}px`
@@ -38,6 +40,36 @@ export function SlideCanvas({ text, background, textStyle, containerWidth = 284,
   const scale  = containerWidth / DESIGN_WIDTH
   const scaledOffset = scaled ? textStyle.positionOffset : textStyle.positionOffset * scale
   const fSize  = scaled ? textStyle.fontSize : Math.max(8, textStyle.fontSize * scale)
+  const baseSize = scaled ? textStyle.fontSize : fSize
+
+  // Auto-fit: long text (a long verse + its reference line) shrinks until it fits the frame
+  // instead of being cut off at the top / bottom. Short text keeps the chosen size.
+  const textLayerRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const layer = textLayerRef.current
+    const el = layer?.firstElementChild as HTMLElement | null
+    if (!layer || !el) return
+    let alive = true
+    const fit = () => {
+      if (!alive) return
+      const cs = getComputedStyle(layer)
+      const availH = layer.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+      const availW = layer.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const min = baseSize * MIN_FIT
+      let size = baseSize
+      el.style.fontSize = `${size}px`
+      while (size > min && (el.offsetHeight > availH || el.scrollWidth > availW + 1)) {
+        size = Math.max(min, size * 0.93)
+        el.style.fontSize = `${size}px`
+      }
+    }
+    fit()
+    // Web fonts can finish loading after the first measurement
+    document.fonts?.ready.then(fit).catch(() => {})
+    return () => { alive = false }
+  // (animation is in the deps because changing it remounts the text element at its base size)
+  }, [text, baseSize, textStyle.fontFamily, textStyle.fontWeight, textStyle.lineHeight,
+      textStyle.verticalPosition, textStyle.positionOffset, JSON.stringify(textStyle.animation), containerWidth, scaled])
 
   // Background element — only apply CSS class for the 4 built-in animated presets
   const bgClass = [
@@ -168,7 +200,7 @@ export function SlideCanvas({ text, background, textStyle, containerWidth = 284,
       )}
 
       {/* Text layer */}
-      <div style={textContainerStyle}>
+      <div ref={textLayerRef} style={textContainerStyle}>
         {animate && hasTextAnimation(textStyle.animation) ? (
           // key restarts the entrance whenever the slide text or settings change
           <AnimatedText key={text + JSON.stringify(textStyle.animation)}

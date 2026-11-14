@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { TopBar } from './TopBar'
 import { StatusBar } from './StatusBar'
 import { SecondScreenNotice } from './SecondScreenNotice'
+import { RemoteModal } from './RemoteModal'
+import { ITEM_KIND, type RemoteCommand, type RemoteSnapshot } from '@/lib/remote'
 import { LeftPanel } from './left/LeftPanel'
 import { CenterPanel } from './center/CenterPanel'
 import { RightPanel } from './right/RightPanel'
@@ -29,7 +31,8 @@ const EMPTY_ITEM: ServiceItem = {
   textStyle: DEFAULT_TEXT_STYLE,
 }
 
-interface QuickSlide { text: string; label: string }
+/** A verse put on air from a search box; version lets Prev / Next step to the neighbouring verse */
+interface QuickSlide { text: string; label: string; version: string }
 
 export function UnifiedLayout() {
   const [items, setItems]                 = useState<ServiceItem[]>([])
@@ -41,6 +44,8 @@ export function UnifiedLayout() {
   const [isLive, setIsLive]               = useState(false)
   const [quickSlide, setQuickSlide]       = useState<QuickSlide | null>(null)
   const [runningText, setRunningText]     = useState<RunningText | null>(null)
+  const [showRemote, setShowRemote]       = useState(false)
+  const [remoteClients, setRemoteClients] = useState<RemoteInfo['clients']>({ operator: 0, speaker: 0 })
   const [editSlideId, setEditSlideId]     = useState<string | null>(null)
   const bgLibrary                         = useBgLibrary()
   const { settings: appSettings, save: saveAppSettings } = useAppSettings()
@@ -193,7 +198,22 @@ ${name}` }],
   const handleBlank     = () => { setIsBlank(v => !v); setIsClearText(false) }
   const handleClearText = () => setIsClearText(v => !v)
 
+  // Quick verse on air: Prev / Next go to the previous / next verse ("Yoh 3:16" → "Yoh 3:17")
+  const stepQuickVerse = (delta: 1 | -1): boolean => {
+    const m = quickSlide?.label.match(/^(.+?)\s+(\d+):(\d+)$/)
+    if (!quickSlide || !m) return false
+    const verse = Number(m[3]) + delta
+    if (verse < 1) return true
+    const { version } = quickSlide
+    fetch(`/api/quick-search/?q=${encodeURIComponent(`${m[1]} ${m[2]}:${verse}`)}&v=${encodeURIComponent(version)}`)
+      .then(r => r.json() as Promise<{ found: boolean; label?: string; text?: string }>)
+      .then(d => { if (d.found && d.label && d.text) handleQuickLaunch(d.text, d.label, version) })
+      .catch(() => {})
+    return true
+  }
+
   const handleNext = () => {
+    if (stepQuickVerse(1)) return
     setQuickSlide(null)
     const slides = activeItem.slides
     const idx = slides.findIndex(s => s.id === activeSlideId)
@@ -202,7 +222,7 @@ ${name}` }],
       setActiveSlideId(next.id)
       if (isLive) setLiveSlideId(next.id)
     } else {
-      const itemIdx  = items.findIndex(i => i.id === activeItemId)
+      const itemIdx  = items.findIndex(i => i.id === activeItem.id)
       const nextItem = items[itemIdx + 1]
       if (nextItem) {
         setActiveItemId(nextItem.id)
@@ -213,6 +233,7 @@ ${name}` }],
   }
 
   const handlePrev = () => {
+    if (stepQuickVerse(-1)) return
     setQuickSlide(null)
     const slides = activeItem.slides
     const idx = slides.findIndex(s => s.id === activeSlideId)
@@ -318,8 +339,8 @@ ${name}` }],
     setActiveSlideId(newItem.slides[0]!.id)
   }
 
-  const handleQuickLaunch = (text: string, label: string) => {
-    setQuickSlide({ text, label })
+  const handleQuickLaunch = (text: string, label: string, version = 'TB') => {
+    setQuickSlide({ text, label, version })
     setIsLive(true)
     setIsBlank(false)
     setIsClearText(false)   // a new verse always shows its text
@@ -393,6 +414,69 @@ ${name}` }],
     setQuickSlide(null)
   }
 
+  // ── Phone remote (Operator / Speaker) — snapshot out, commands in ──
+
+  const scriptureText = (type: ServiceItem['type'], s: Slide) =>
+    type === 'scripture' && appSettings.scripture.showReference && s.label && s.text ? `${s.label}\n“${s.text}”` : s.text
+
+  const remoteNext = ((): RemoteSnapshot['next'] => {
+    if (quickSlide || isEmpty) return null
+    if (!isLive) return { label: activeSlide.label, text: scriptureText(activeItem.type, activeSlide) || activeItem.title }
+    const base = liveItem ?? activeItem
+    const idx  = base.slides.findIndex(s => s.id === liveSlideId)
+    const nextInItem = base.slides[idx + 1]
+    const nextItem   = nextInItem ? base : items[items.findIndex(i => i.id === base.id) + 1]
+    const slide      = nextInItem ?? nextItem?.slides[0]
+    return slide && nextItem ? { label: slide.label || nextItem.title, text: scriptureText(nextItem.type, slide) || nextItem.title } : null
+  })()
+
+  const remoteSnapshot: RemoteSnapshot = {
+    isLive, isBlank, isClear: isClearText,
+    live: rawLiveSlide ? {
+      title: quickSlide ? quickSlide.label : (liveItem ?? activeItem).title,
+      label: quickSlide ? '' : rawLiveSlide.label,
+      text: withReference(rawLiveSlide).text || (liveItem ?? activeItem).title,
+    } : null,
+    next: remoteNext,
+    items: items.map(i => ({ id: i.id, title: i.title, subtitle: i.subtitle, kind: ITEM_KIND[i.type] })),
+    activeItemId: isEmpty ? '' : activeItem.id,
+    activeTitle: activeItem.title,
+    liveItemId: liveItem?.id ?? null,
+    slides: isEmpty ? [] : activeItem.slides.map(s => ({ id: s.id, label: s.label, text: s.text })),
+    activeSlideId: activeSlide.id,
+    liveSlideId,
+    runningText: runningText?.text ?? null,
+  }
+  const remoteJson = JSON.stringify(remoteSnapshot)
+  useEffect(() => { window.electronAPI?.remoteSendState?.(remoteJson) }, [remoteJson])
+
+  // Commands arrive asynchronously — always run them against the latest handlers / state
+  const remoteCommand = useRef<(cmd: RemoteCommand) => void>(() => {})
+  remoteCommand.current = (cmd: RemoteCommand) => {
+    switch (cmd.type) {
+      case 'prev':  handlePrev(); break
+      case 'next':  handleNext(); break
+      case 'live':  handleGoLive(); break
+      case 'blank': handleBlank(); break
+      case 'clear': handleClearText(); break
+      case 'selectItem': {
+        const item = items.find(i => i.id === cmd.id)
+        if (item) { setActiveItemId(item.id); setActiveSlideId(item.slides[0]?.id ?? '') }
+        break
+      }
+      case 'quick':
+        if (cmd.text && cmd.label) handleQuickLaunch(cmd.text, cmd.label, cmd.version)
+        break
+      case 'liveSlide': {
+        const item = items.find(i => i.id === cmd.itemId)
+        if (item?.slides.some(s => s.id === cmd.slideId)) { setActiveItemId(item.id); handleGoLiveSlide(cmd.slideId) }
+        break
+      }
+    }
+  }
+  useEffect(() => window.electronAPI?.onRemoteCommand?.(cmd => remoteCommand.current(cmd as RemoteCommand)), [])
+  useEffect(() => window.electronAPI?.onRemoteClients?.(setRemoteClients), [])
+
   const editingSlide = editSlideId
     ? items.flatMap(i => i.slides).find(s => s.id === editSlideId) ?? null
     : null
@@ -411,6 +495,8 @@ ${name}` }],
         onQuickLaunch={handleQuickLaunch}
         onGotoItem={handleGotoItem}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenRemote={() => setShowRemote(true)}
+        remoteCount={remoteClients.operator + remoteClients.speaker}
       />
 
       <SecondScreenNotice enabled={appSettings.output.display1.enabled} />
@@ -497,7 +583,11 @@ ${name}` }],
         slide={quickSlide ? { id: '__qs__', label: quickSlide.label, text: quickSlide.text } : activeSlide}
         liveSlideId={quickSlide ? '__quick__' : liveSlideId}
         isLive={isLive}
+        remotes={remoteClients}
+        onOpenRemote={() => setShowRemote(true)}
       />
+
+      {showRemote && <RemoteModal clients={remoteClients} onClose={() => setShowRemote(false)} />}
 
       {showSettings && (
         <SettingsModal

@@ -21,7 +21,7 @@ interface Props {
   onAddScripture: (payload: ScriptureAddPayload) => void
   onAddSong: (item: ServiceItem, hasSavedSettings?: boolean) => void
   onAddMedia: (file: MediaFile) => void
-  onQuickLaunch: (text: string, label: string) => void
+  onQuickLaunch: (text: string, label: string, version?: string) => void
   onLoadScene: (items: ServiceItem[], scene: SceneRef) => void
   currentScene: SceneRef | null
   onSceneSaved: (scene: SceneRef) => void

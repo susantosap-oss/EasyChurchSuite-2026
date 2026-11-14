@@ -38,17 +38,31 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .it b{display:block;font-size:13px;color:#93c5fd;margin-bottom:2px}.it.lv b{color:#fca5a5}
 .it span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line;font-size:14px;color:#cbd5e1}
 .it i{font-style:normal;font-size:12px;color:#64748b}
+.it.pic{display:flex;align-items:center;gap:10px}
+.it.pic img{width:96px;aspect-ratio:16/9;object-fit:contain;background:#000;border-radius:6px;flex-shrink:0}
 .empty{color:#64748b;text-align:center;padding:24px 8px;font-size:14px}
 .lh{font-size:12px;font-weight:700;color:#94a3b8;margin:2px 2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* speaker */
-.stage{flex:1;display:flex;flex-direction:column;min-height:0}
-.now{flex:1;display:flex;flex-direction:column;justify-content:center;padding:16px 18px;min-height:0;overflow:hidden}
-.now small{color:#64748b;font-size:14px;margin-bottom:8px}
-.now p{margin:0;white-space:pre-line;line-height:1.25;font-weight:700;color:#fff}
-.now p.dim{color:#475569;font-weight:600}
-.next{border-top:1px solid #1f2937;padding:12px 18px;padding-bottom:max(12px,env(safe-area-inset-bottom));background:#111827;max-height:32%;overflow:hidden}
-.next small{color:#f59e0b;font-size:12px;font-weight:700;letter-spacing:.05em}
-.next p{margin:4px 0 0;white-space:pre-line;color:#94a3b8;font-size:17px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.mon{margin:10px 12px 0}
+.cap{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#64748b;margin-bottom:4px}
+.cap.lv{color:#f87171}.cap span:last-child{color:#94a3b8;letter-spacing:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scr{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden;border:2px solid #1f2937;display:flex;align-items:center;justify-content:center}
+.scr.on{border-color:#dc2626}
+.scr img{width:100%;height:100%;object-fit:contain;display:block}
+.scr p{margin:0;padding:5%;white-space:pre-line;text-align:center;font-weight:700;line-height:1.25;color:#fff}
+.scr p.dim{color:#475569;font-weight:600;font-size:13px}
+.pvw{display:grid;grid-template-columns:1.1fr 1fr;gap:10px;margin:10px 12px 0;align-items:end}
+.pvw .scr p{font-size:11px;font-weight:600;color:#cbd5e1;padding:6px;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+.info{font-size:13px;color:#94a3b8;padding-bottom:4px;min-width:0}
+.info b{display:block;color:#fde68a;font-size:14px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.info i{font-style:normal;display:block;font-size:20px;font-weight:700;color:#fff}
+.btn:disabled{opacity:.35}
+.decks{flex:1;overflow:auto;margin:10px 12px 0;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.decks h4{margin:4px 2px 8px;font-size:11px;letter-spacing:.06em;color:#64748b}
+.dk{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;margin-bottom:6px;border-radius:10px;background:#111827;border:1px solid #1f2937}
+.dk.sel{border-color:#f59e0b;background:#1c1405}.dk.lv{border-color:#dc2626;background:#2a0f12}
+.dk span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.dk i{font-style:normal;font-size:12px;color:#64748b}
 .ticker{background:#fff;color:#000;font-weight:600;padding:6px 14px;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:none}
 .ticker.show{display:block}
 .srch{display:flex;gap:6px;margin-bottom:8px}
@@ -61,13 +75,39 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .res b{display:block;color:#86efac;margin-bottom:6px}
 .res p{margin:0 0 10px;white-space:pre-line;font-size:15px;line-height:1.4;color:#e2e8f0}
 .err{color:#fca5a5;font-size:14px;padding:8px 2px}
-.zoom{display:flex;gap:6px}.zoom button{width:34px;height:30px;border-radius:8px;background:#1f2937;font-weight:700}
+.zoom{display:flex;gap:6px}
+.main{flex:1;display:flex;flex-direction:column;min-height:0}
+.colA,.colB{display:flex;flex-direction:column;min-height:0}
+.colB{flex:1}
+.prev img{display:none;width:100%;max-height:160px;object-fit:contain;border-radius:6px;background:#000}
+.prev.pic img{display:block}.prev.pic p{display:none}
+.md{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;margin-bottom:6px;border-radius:10px;background:#0f172a;border:1px solid #1f2937}
+.md.act{border-color:#3b82f6}.md.off{opacity:.45}
+.md .th{width:52px;height:30px;border-radius:6px;background:#111827;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:16px}
+.md .th img{width:100%;height:100%;object-fit:cover}
+.md span{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.md i{font-style:normal;font-size:11px;color:#64748b;flex-shrink:0}
+.note{font-size:12px;color:#64748b;margin:2px 2px 8px}
+/* Landscape (default for the remote): two columns */
+@media (orientation:landscape){
+  .main{flex-direction:row}
+  .colA{width:48%;overflow:auto}
+  .colB{width:52%}
+  .prev{min-height:0;margin:8px}.prev p{-webkit-line-clamp:4;font-size:14px}
+  .row{margin:0 8px 6px}.btn{padding:11px 6px;font-size:15px}.btn.big{padding:14px 6px;font-size:17px}
+  .tabs{margin:8px 8px 0}.list{margin:0 8px 8px}
+  .mon{margin:8px}.speak .colA{width:58%}.speak .colB{width:42%}
+  .pvw{margin:8px 8px 0;grid-template-columns:1fr}.pvw .info{display:none}
+  .speak .row{margin:8px 8px 0 !important}
+  .decks{margin:8px}
+}.zoom button{width:34px;height:30px;border-radius:8px;background:#1f2937;font-weight:700}
 `
 
 const JS = `
 var ROLE = window.__ROLE, KEY = window.__KEY;
 var S = null, tab = 'slides', scale = 1;
 var B = { v: 'TB', versions: [], q: '', res: null, err: '', busy: false };
+var M = { files: null, err: '', opening: '' };
 try { scale = parseFloat(localStorage.getItem('ec-scale') || '1') || 1 } catch (e) {}
 var $ = function (id) { return document.getElementById(id) };
 function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e }
@@ -98,19 +138,30 @@ function renderOperator() {
   $('t1').className = 'tab' + (tab === 'slides' ? ' on' : '');
   $('t2').className = 'tab' + (tab === 'items' ? ' on' : '');
   $('t3').className = 'tab' + (tab === 'bible' ? ' on' : '');
+  $('t4').className = 'tab' + (tab === 'media' ? ' on' : '');
+  var pim = $('pvim');
+  if (live && S.liveImage) { if (pim.getAttribute('data-u') !== S.liveImage) { pim.setAttribute('data-u', S.liveImage); pim.src = imgUrl(S.liveImage) } $('pv').className += ' pic' }
   var list = $('ls');
   // Keep the search box (and the phone keyboard) alone while live updates arrive
   if (tab === 'bible' && list.querySelector('input') === document.activeElement) return;
   list.textContent = '';
   if (tab === 'bible') { renderBible(list); return }
+  if (tab === 'media') { renderMedia(list); return }
   if (!S) { list.appendChild(el('div', 'empty', 'Menghubungkan…')); return }
   if (tab === 'slides') {
     if (!S.slides.length) { list.appendChild(el('div', 'empty', 'Belum ada item dipilih')); return }
     list.appendChild(el('div', 'lh', S.activeTitle));
     S.slides.forEach(function (sl, i) {
       var b = el('button', 'it' + (sl.id === S.liveSlideId && S.isLive ? ' lv' : sl.id === S.activeSlideId ? ' act' : ''));
-      b.appendChild(el('b', null, (i + 1) + '. ' + (sl.label || 'Slide')));
-      b.appendChild(el('span', null, sl.text || '—'));
+      if (sl.image) {
+        b.className += ' pic';
+        var im = el('img'); im.loading = 'lazy'; im.alt = ''; im.src = imgUrl(sl.image);
+        b.appendChild(im);
+        b.appendChild(el('b', null, (i + 1) + '. ' + (sl.label || 'Hal ' + (i + 1))));
+      } else {
+        b.appendChild(el('b', null, (i + 1) + '. ' + (sl.label || 'Slide')));
+        b.appendChild(el('span', null, sl.text || '—'));
+      }
       b.onclick = function () { send({ type: 'liveSlide', itemId: S.activeItemId, slideId: sl.id }) };
       list.appendChild(b);
     });
@@ -158,6 +209,35 @@ function stepVerse(d) {
   search(label.slice(0, sp) + ' ' + B.res.ref.chapter + ':' + next, true);
 }
 
+function loadMedia() {
+  api('/media').then(function (d) { M.files = (d && d.files) || []; M.err = ''; if (tab === 'media') render() })
+    .catch(function () { M.err = 'Tidak bisa memuat media'; render() });
+}
+
+function renderMedia(list) {
+  list.appendChild(el('div', 'note', 'Ketuk file untuk menambahkannya ke Urutan Ibadah, lalu Go Live. PDF dikonversi dulu di PC (beberapa detik).'));
+  if (M.err) list.appendChild(el('div', 'err', M.err));
+  if (!M.files) { list.appendChild(el('div', 'empty', 'Memuat…')); loadMedia(); return }
+  if (!M.files.length) { list.appendChild(el('div', 'empty', 'Media Library kosong')); return }
+  M.files.forEach(function (f) {
+    var blocked = f.kind === 'ppt' || f.playable === false;
+    var active = S && S.activeItemId === 'lib_' + f.file;
+    var b = el('button', 'md' + (blocked ? ' off' : '') + (active ? ' act' : ''));
+    var th = el('div', 'th');
+    if (f.kind === 'image') { var im = el('img'); im.src = imgUrl(f.url); im.alt = ''; th.appendChild(im) }
+    else th.textContent = f.kind === 'video' ? '🎬' : f.kind === 'pdf' ? '📑' : '📊';
+    b.appendChild(th);
+    b.appendChild(el('span', null, f.name));
+    b.appendChild(el('i', null, M.opening === f.file ? 'Membuka…' : blocked ? (f.kind === 'ppt' ? 'Jadikan PDF' : 'Dikonversi') : f.kind.toUpperCase()));
+    if (!blocked) b.onclick = function () {
+      M.opening = f.file; render();
+      send({ type: 'media', file: f.file });
+      setTimeout(function () { M.opening = ''; tab = 'slides'; render() }, f.kind === 'pdf' ? 2500 : 600);
+    };
+    list.appendChild(b);
+  });
+}
+
 function renderBible(list) {
   var vers = el('div', 'vers');
   (B.versions.length ? B.versions : [B.v]).forEach(function (code) {
@@ -192,28 +272,106 @@ function renderBible(list) {
   if (!B.versions.length) loadVersions();
 }
 
-function fit() {
-  var box = $('now'), p = $('nt');
-  var size = Math.min(box.clientWidth / 8, 120) * scale;
-  p.style.fontSize = size + 'px';
-  while (size > 14 && (p.scrollHeight > box.clientHeight - 40 || p.scrollWidth > box.clientWidth)) {
-    size -= 2; p.style.fontSize = size + 'px';
+var sel = null;   /* Speaker: chosen deck page waiting in the preview { id, page } */
+
+function deckById(id) { return S && S.decks ? S.decks.filter(function (d) { return d.id === id })[0] : null }
+function imgUrl(u) { return '/img?k=' + encodeURIComponent(KEY) + '&u=' + encodeURIComponent(u) }
+
+/* Picture or text in a monitor box; an unchanged picture is left alone (no flicker) */
+function showIn(box, img, text, dimText) {
+  if (img) {
+    var cur = box.firstChild;
+    if (cur && cur.tagName === 'IMG' && cur.getAttribute('data-u') === img) return;
+    box.textContent = '';
+    var i = el('img'); i.setAttribute('data-u', img); i.src = imgUrl(img); i.alt = '';
+    box.appendChild(i);
+    return;
   }
+  box.textContent = '';
+  box.appendChild(el('p', text ? '' : 'dim', text || dimText));
+}
+
+function fitLive() {
+  var box = $('lvs'), p = box.querySelector('p');
+  if (!p || p.className === 'dim') return;
+  var size = Math.min(box.clientWidth / 9, 72) * scale;
+  p.style.fontSize = size + 'px';
+  while (size > 9 && (p.scrollHeight > box.clientHeight || p.scrollWidth > box.clientWidth)) { size -= 1; p.style.fontSize = size + 'px' }
+}
+
+/* What the preview shows: a chosen page (not live yet), else the page after the live one */
+function previewTarget() {
+  var ld = S && S.liveDeck;
+  if (sel && deckById(sel.id) && (!ld || sel.id !== ld.id)) return { deck: deckById(sel.id), page: sel.page, mode: 'sel' };
+  if (ld && deckById(ld.id)) return { deck: deckById(ld.id), page: ld.page + 1, mode: 'live' };
+  return null;
 }
 
 function renderSpeaker() {
   status();
-  var live = S && S.isLive && !S.isBlank && S.live;
-  $('nl').textContent = live ? (S.live.title + (S.live.label ? ' · ' + S.live.label : '')) : '';
-  var p = $('nt');
-  if (live && !S.isClear && S.live.text) { p.className = ''; p.textContent = S.live.text }
-  else { p.className = 'dim'; p.textContent = S && S.isBlank ? '— Layar blank —' : '— Belum ada yang tampil —' }
-  $('nx').textContent = S && S.next ? S.next.text : '—';
-  $('nxl').textContent = S && S.next ? 'BERIKUTNYA · ' + S.next.label : 'BERIKUTNYA';
+  var live = !!(S && S.isLive && !S.isBlank);
+  $('lvs').className = 'scr' + (live ? ' on' : '');
+  $('lvl').textContent = live && S.live ? S.live.title + (S.live.label ? ' · ' + S.live.label : '') : '';
+  var liveText = live && S.live && !S.isClear ? S.live.text : '';
+  showIn($('lvs'), live ? S.liveImage : null, liveText,
+    S && S.isBlank ? '— Layar blank —' : S && S.isLive && S.isClear ? '— Teks di-clear —' : '— Belum ada yang tampil —');
+
+  var pt = previewTarget(), info = $('pvi');
+  info.textContent = '';
+  if (pt) {
+    var d = pt.deck, n = d.pages.length;
+    if (pt.page >= n) showIn($('pvs'), null, '', '— Akhir presentasi —');
+    else if (d.kind === 'video') showIn($('pvs'), null, '🎬 ' + d.name, '');
+    else showIn($('pvs'), d.pages[pt.page], '', '');
+    info.appendChild(el('b', null, d.name));
+    info.appendChild(el('i', null, pt.page < n ? 'Hal ' + (pt.page + 1) + ' / ' + n : 'Selesai'));
+    info.appendChild(el('span', null, pt.mode === 'sel' ? 'Belum tampil — tekan Live' : 'Halaman berikutnya'));
+    $('pvc').textContent = (pt.page < n ? 'Hal ' + (pt.page + 1) + '/' + n : 'Selesai') + (pt.mode === 'sel' ? ' · belum tampil' : '');
+  } else {
+    showIn($('pvs'), null, S && S.next ? S.next.text : '', '—');
+    info.appendChild(el('b', null, 'Berikutnya'));
+    info.appendChild(el('span', null, S && S.next ? S.next.label : 'Pilih presentasi di bawah'));
+    $('pvc').textContent = S && S.next ? S.next.label : '';
+  }
+
+  var canStep = !!pt, sl = $('sl');
+  $('sp').disabled = !canStep || (pt.mode === 'sel' ? pt.page <= 0 : S.liveDeck.page <= 0);
+  $('sn').disabled = !canStep || (pt.mode === 'sel' ? pt.page >= pt.deck.pages.length - 1 : pt.page >= pt.deck.pages.length);
+  sl.disabled = !pt || pt.mode !== 'sel';
+  sl.textContent = pt && pt.mode === 'live' ? '● LIVE' : '● Live';
+  sl.className = 'btn go' + (pt && pt.mode === 'live' ? ' on' : '');
+
+  var list = $('dl'); list.textContent = '';
+  list.appendChild(el('h4', null, 'PRESENTASI SAYA'));
+  if (!S || !S.decks || !S.decks.length) {
+    list.appendChild(el('div', 'empty', 'Belum ada file. Minta Operator mencentang [v] Speaker pada file di Media.'));
+  } else {
+    S.decks.forEach(function (d) {
+      var isLive = S.liveDeck && S.liveDeck.id === d.id;
+      var b = el('button', 'dk' + (isLive ? ' lv' : sel && sel.id === d.id ? ' sel' : ''));
+      b.appendChild(el('span', null, (d.kind === 'pdf' ? '📑 ' : d.kind === 'video' ? '🎬 ' : '🖼 ') + d.name));
+      b.appendChild(el('i', null, isLive ? 'LIVE' : d.kind === 'pdf' ? d.pages.length + ' hal' : d.kind === 'video' ? 'Video' : 'Gambar'));
+      b.onclick = function () { sel = isLive ? null : { id: d.id, page: 0 }; render() };
+      list.appendChild(b);
+    });
+  }
+
   var tk = $('tk');
   tk.className = 'ticker' + (S && S.runningText ? ' show' : '');
   tk.textContent = S && S.runningText ? S.runningText : '';
-  fit();
+  fitLive();
+}
+
+function speakerStep(delta) {
+  var pt = previewTarget(); if (!pt) return;
+  if (pt.mode === 'sel') { sel.page = Math.max(0, Math.min(pt.deck.pages.length - 1, sel.page + delta)); render() }
+  else send({ type: 'deckStep', delta: delta });
+}
+
+function speakerLive() {
+  var pt = previewTarget(); if (!pt || pt.mode !== 'sel') return;
+  send({ type: 'deck', id: pt.deck.id, page: pt.page });
+  sel = null;
 }
 
 function render() { if (ROLE === 'operator') renderOperator(); else renderSpeaker() }
@@ -230,7 +388,7 @@ function tick() {
   $('ck').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
 }
 
-window.addEventListener('resize', function () { if (ROLE === 'speaker') fit() });
+window.addEventListener('resize', function () { if (ROLE === 'speaker') fitLive() });
 document.addEventListener('DOMContentLoaded', function () {
   if (ROLE === 'operator') {
     $('pr').onclick = function () { send({ type: 'prev' }) };
@@ -241,23 +399,34 @@ document.addEventListener('DOMContentLoaded', function () {
     $('t1').onclick = function () { tab = 'slides'; render() };
     $('t2').onclick = function () { tab = 'items'; render() };
     $('t3').onclick = function () { tab = 'bible'; render() };
+    $('t4').onclick = function () { tab = 'media'; M.files = null; render() };
   } else {
-    $('zm').onclick = function () { scale = Math.max(0.5, scale - 0.1); try { localStorage.setItem('ec-scale', scale) } catch (e) {} fit() };
-    $('zp').onclick = function () { scale = Math.min(2, scale + 0.1); try { localStorage.setItem('ec-scale', scale) } catch (e) {} fit() };
+    $('zm').onclick = function () { scale = Math.max(0.5, scale - 0.1); try { localStorage.setItem('ec-scale', scale) } catch (e) {} fitLive() };
+    $('zp').onclick = function () { scale = Math.min(2, scale + 0.1); try { localStorage.setItem('ec-scale', scale) } catch (e) {} fitLive() };
+    $('sp').onclick = function () { speakerStep(-1) };
+    $('sn').onclick = function () { speakerStep(1) };
+    $('sl').onclick = function () { speakerLive() };
   }
   tick(); setInterval(tick, 10000);
   render(); connect();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+  if (window.matchMedia && matchMedia('(display-mode: standalone)').matches && screen.orientation && screen.orientation.lock) {
+    screen.orientation.lock('landscape').catch(function () {});
+  }
 });
 `
 
 const OPERATOR_BODY = `
 <div class="bar"><span class="dot" id="dot"></span><b>Operator</b><span class="sp"></span><span class="pill" id="st">STANDBY</span><span class="clock" id="ck"></span></div>
 <div class="off" id="off">Terputus dari PC — menyambung ulang… (pastikan HP di Wi-Fi yang sama)</div>
-<div class="prev" id="pv"><small id="pvl">Belum Live</small><p id="pvt"></p></div>
+<div class="main"><div class="colA">
+<div class="prev" id="pv"><small id="pvl">Belum Live</small><p id="pvt"></p><img id="pvim" alt=""></div>
 <div class="row r2"><button class="btn big" id="pr">◄ Prev</button><button class="btn big" id="nx2">Next ►</button></div>
 <div class="row r3"><button class="btn go" id="go">● Go Live</button><button class="btn" id="bl">Blank</button><button class="btn clr" id="cl">Clear</button></div>
-<div class="tabs"><button class="tab on" id="t1">Slide</button><button class="tab" id="t2">Urutan</button><button class="tab" id="t3">Alkitab</button></div>
+</div><div class="colB">
+<div class="tabs"><button class="tab on" id="t1">Slide</button><button class="tab" id="t2">Urutan</button><button class="tab" id="t3">Alkitab</button><button class="tab" id="t4">Media</button></div>
 <div class="list" id="ls"></div>
+</div></div>
 `
 
 const SPEAKER_BODY = `
@@ -265,8 +434,13 @@ const SPEAKER_BODY = `
 <span class="zoom"><button id="zm">A−</button><button id="zp">A+</button></span><span class="clock" id="ck"></span></div>
 <div class="off" id="off">Terputus dari PC — menyambung ulang… (pastikan HP di Wi-Fi yang sama)</div>
 <div class="ticker" id="tk"></div>
-<div class="stage"><div class="now" id="now"><small id="nl"></small><p id="nt" class="dim">— Belum ada yang tampil —</p></div>
-<div class="next"><small id="nxl">BERIKUTNYA</small><p id="nx">—</p></div></div>
+<div class="main speak"><div class="colA">
+<div class="mon"><div class="cap lv"><span>● LIVE VIEW</span><span id="lvl"></span></div><div class="scr" id="lvs"></div></div>
+</div><div class="colB">
+<div class="pvw"><div><div class="cap"><span>PREVIEW</span><span id="pvc"></span></div><div class="scr" id="pvs"></div></div><div class="info" id="pvi"></div></div>
+<div class="row r3" style="margin:10px 12px 0"><button class="btn" id="sp">◄ Prev</button><button class="btn go" id="sl">● Live</button><button class="btn" id="sn">Next ►</button></div>
+<div class="decks" id="dl"></div>
+</div></div>
 `
 
 export function remotePage(role: RemoteRole, key: string): string {

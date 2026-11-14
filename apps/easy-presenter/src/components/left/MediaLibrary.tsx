@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { convertPdfToSlides } from '@/lib/pdfToSlides'
+import { useSpeakerDecks, markSpeakerDeck, unmarkSpeakerDeck } from '@/lib/speakerDecks'
 
 export interface MediaFile {
   id: string
@@ -99,6 +100,8 @@ function statusText(file: MediaFile): string | null {
 }
 
 export function MediaLibrary({ onAdd }: Props) {
+  const speakerDecks = useSpeakerDecks()
+  const speakerFiles = new Set(speakerDecks.map(d => d.file))
   const fileRef = useRef<HTMLInputElement>(null)
   const [files, setFiles]           = useState<MediaFile[]>([])
   const [loading, setLoading]       = useState(true)
@@ -171,14 +174,14 @@ export function MediaLibrary({ onAdd }: Props) {
       const res = await fetch(`/api/media/${encodeURIComponent(file.id)}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setFiles(prev => prev.filter(f => f.id !== file.id))
+      if (speakerFiles.has(file.id)) void unmarkSpeakerDeck(file.id).catch(() => {})
     } catch (err) {
       setError(`Gagal menghapus: ${err instanceof Error ? err.message : 'error'}`)
     }
   }
 
-  // PDF → one image per page, added as a presentation (page-by-page slides)
-  const addPdf = async (file: MediaFile) => {
-    setError('')
+  // PDF → one image per page (stored on the server)
+  const renderPdf = async (file: MediaFile): Promise<string[]> => {
     setPdfConv({ id: file.id, done: 0, total: 0 })
     try {
       const blob = await fetch(file.url).then(r => r.blob())
@@ -187,11 +190,36 @@ export function MediaLibrary({ onAdd }: Props) {
         p => setPdfConv({ id: file.id, ...p }),
       )
       if (!pages.length) throw new Error('PDF tidak punya halaman')
+      return pages
+    } finally {
+      setPdfConv(null)
+    }
+  }
+
+  // PDF added as a presentation (page-by-page slides); pages already rendered for the Speaker are reused
+  const addPdf = async (file: MediaFile) => {
+    setError('')
+    try {
+      const marked = speakerDecks.find(d => d.file === file.id && d.pages.length)
+      const pages  = marked?.pages ?? await renderPdf(file)
       onAdd({ ...file, mediaType: 'slides', url: pages[0]!, pages, name: file.name.replace(/\.pdf$/i, '') })
     } catch (err) {
       setError(`Gagal konversi PDF: ${err instanceof Error ? err.message : 'error'}`)
-    } finally {
-      setPdfConv(null)
+    }
+  }
+
+  // [v] Speaker — the file appears on the Speaker remote; PDFs are rendered once, here
+  const toggleSpeaker = async (file: MediaFile) => {
+    setError('')
+    try {
+      if (speakerFiles.has(file.id)) { await unmarkSpeakerDeck(file.id); return }
+      const kind = file.mediaType
+      if (kind !== 'pdf' && kind !== 'image' && kind !== 'video') return
+      const pages = kind === 'pdf' ? await renderPdf(file) : []
+      if (pages.some(p => !p.startsWith('/api/'))) throw new Error('halaman gagal disimpan di server')
+      await markSpeakerDeck({ file: file.id, name: file.name.replace(/\.pdf$/i, ''), kind, url: file.url, pages })
+    } catch (err) {
+      setError(`Gagal menandai untuk Speaker: ${err instanceof Error ? err.message : 'error'}`)
     }
   }
 
@@ -264,6 +292,7 @@ export function MediaLibrary({ onAdd }: Props) {
           const busy       = isBusy(file)
           const blocked    = busy || file.playable === false || file.mediaType === 'ppt'
           const status     = statusText(file)
+          const forSpeaker = speakerFiles.has(file.id)
           return (
             <div
               key={file.id}
@@ -297,6 +326,23 @@ export function MediaLibrary({ onAdd }: Props) {
                       ? 'Simpan sebagai PDF dulu di PowerPoint'
                       : `${TYPE_LABELS[file.mediaType]} · ${formatSize(file.size)}`)}
                 </div>
+                {!blocked && (
+                  <button
+                    onClick={() => void toggleSpeaker(file)}
+                    disabled={!!pdfConv}
+                    title={forSpeaker
+                      ? 'Bisa dibuka & dikontrol dari Remote Speaker — klik untuk melepas'
+                      : 'Izinkan Remote Speaker membuka & mengontrol file ini'}
+                    className="flex items-center gap-1 mt-0.5 text-[9px] leading-none"
+                    style={{ color: forSpeaker ? '#fbbf24' : '#64748b' }}
+                  >
+                    <span className="w-3 h-3 rounded-sm flex items-center justify-center text-[9px] leading-none"
+                      style={{ background: forSpeaker ? '#f59e0b' : 'transparent', border: '1px solid #f59e0b', color: '#000' }}>
+                      {forSpeaker ? '✓' : ''}
+                    </span>
+                    Speaker
+                  </button>
+                )}
                 {busy && (
                   <div className="h-0.5 mt-1 rounded-full overflow-hidden" style={{ background: '#1e2535' }}>
                     <div className="h-full" style={{ width: `${(file.job?.progress ?? 0) * 100}%`, background: '#f59e0b' }} />
@@ -305,7 +351,7 @@ export function MediaLibrary({ onAdd }: Props) {
               </div>
 
               {/* Actions */}
-              <div className={`flex gap-1 transition-opacity flex-shrink-0 ${conv || confirming ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+              <div className={`gap-1 flex-shrink-0 ${conv || confirming ? 'flex' : 'hidden group-hover:flex'}`}>
                 {!confirming && (
                   <button
                     onClick={() => handleAdd(file)}

@@ -6,6 +6,8 @@ import { StatusBar } from './StatusBar'
 import { SecondScreenNotice } from './SecondScreenNotice'
 import { RemoteModal } from './RemoteModal'
 import { ITEM_KIND, type RemoteCommand, type RemoteSnapshot } from '@/lib/remote'
+import { useSpeakerDecks, type SpeakerDeck } from '@/lib/speakerDecks'
+import { convertPdfToSlides } from '@/lib/pdfToSlides'
 import { LeftPanel } from './left/LeftPanel'
 import { CenterPanel } from './center/CenterPanel'
 import { RightPanel } from './right/RightPanel'
@@ -32,6 +34,17 @@ const EMPTY_ITEM: ServiceItem = {
 }
 
 /** A verse put on air from a search box; version lets Prev / Next step to the neighbouring verse */
+/** Service items opened from the Speaker remote: "spk_<media file>" */
+const DECK_PREFIX = 'spk_'
+/** Service items opened from the Operator remote's Media tab: "lib_<media file>" */
+const LIB_PREFIX = 'lib_'
+
+const deckToMedia = (d: SpeakerDeck): MediaFile => ({
+  id: d.file, name: d.name, url: d.url, size: 0,
+  mediaType: d.pages.length ? 'slides' : d.kind,
+  pages: d.pages.length ? d.pages : undefined,
+})
+
 interface QuickSlide { text: string; label: string; version: string }
 
 export function UnifiedLayout() {
@@ -46,6 +59,7 @@ export function UnifiedLayout() {
   const [runningText, setRunningText]     = useState<RunningText | null>(null)
   const [showRemote, setShowRemote]       = useState(false)
   const [remoteClients, setRemoteClients] = useState<RemoteInfo['clients']>({ operator: 0, speaker: 0 })
+  const speakerDecks                      = useSpeakerDecks()
   const [editSlideId, setEditSlideId]     = useState<string | null>(null)
   const bgLibrary                         = useBgLibrary()
   const { settings: appSettings, save: saveAppSettings } = useAppSettings()
@@ -315,8 +329,7 @@ ${name}` }],
     setActiveSlideId(item.slides[0]!.id)
   }
 
-  const handleAddMedia = (file: MediaFile) => {
-    const newId = `media_${Date.now()}`
+  const makeMediaItem = (file: MediaFile, newId = `media_${Date.now()}`): ServiceItem => {
     const SUBTITLES: Record<MediaFile['mediaType'], string> = {
       image: 'Gambar', video: 'Video', ppt: 'PowerPoint', pdf: 'PDF', slides: 'Presentasi',
     }
@@ -334,8 +347,38 @@ ${name}` }],
       mediaUrl: file.url,
       mediaType: file.mediaType,
     }
+    return newItem
+  }
+
+  // Operator remote → Media tab: library file as a service item (reused if already added).
+  // PDFs reuse the pages rendered for the Speaker, otherwise they are rendered here.
+  const openLibraryMedia = async (file: string) => {
+    const id = LIB_PREFIX + file
+    const existing = items.find(i => i.id === id)
+    if (existing) { setActiveItemId(id); setActiveSlideId(existing.slides[0]!.id); return }
+    const list = await fetch('/api/media/').then(r => r.json() as Promise<{
+      files?: { file: string; name: string; kind: MediaFile['mediaType']; url: string; playable?: boolean }[]
+    }>)
+    const m = list.files?.find(f => f.file === file)
+    if (!m || m.kind === 'ppt' || m.playable === false) return
+    let media: MediaFile = { id: m.file, name: m.name, url: m.url, size: 0, mediaType: m.kind }
+    if (m.kind === 'pdf') {
+      const deck  = speakerDecks.find(d => d.file === m.file && d.pages.length)
+      const pages = deck?.pages ?? await convertPdfToSlides(
+        new File([await fetch(m.url).then(r => r.blob())], m.name, { type: 'application/pdf' }))
+      if (!pages.length) return
+      media = { ...media, mediaType: 'slides', url: pages[0]!, pages, name: m.name.replace(/\.pdf$/i, '') }
+    }
+    const item = makeMediaItem(media, id)
+    setItems(prev => prev.some(i => i.id === id) ? prev : [...prev, item])
+    setActiveItemId(id)
+    setActiveSlideId(item.slides[0]!.id)
+  }
+
+  const handleAddMedia = (file: MediaFile) => {
+    const newItem = makeMediaItem(file)
     setItems(prev => [...prev, newItem])
-    setActiveItemId(newId)
+    setActiveItemId(newItem.id)
     setActiveSlideId(newItem.slides[0]!.id)
   }
 
@@ -442,10 +485,15 @@ ${name}` }],
     activeItemId: isEmpty ? '' : activeItem.id,
     activeTitle: activeItem.title,
     liveItemId: liveItem?.id ?? null,
-    slides: isEmpty ? [] : activeItem.slides.map(s => ({ id: s.id, label: s.label, text: s.text })),
+    slides: isEmpty ? [] : activeItem.slides.map(s => ({ id: s.id, label: s.label, text: s.text, image: s.image })),
     activeSlideId: activeSlide.id,
     liveSlideId,
     runningText: runningText?.text ?? null,
+    decks: speakerDecks.map(d => ({ id: d.file, name: d.name, kind: d.kind, pages: d.pages.length ? d.pages : [d.url] })),
+    liveDeck: isLive && liveItem?.id.startsWith(DECK_PREFIX)
+      ? { id: liveItem.id.slice(DECK_PREFIX.length), page: Math.max(0, liveItem.slides.findIndex(s => s.id === liveSlideId)) }
+      : null,
+    liveImage: isLive && !isBlank ? (rawLiveSlide?.image ?? (liveMediaType === 'image' ? liveMediaUrl ?? null : null)) : null,
   }
   const remoteJson = JSON.stringify(remoteSnapshot)
   useEffect(() => { window.electronAPI?.remoteSendState?.(remoteJson) }, [remoteJson])
@@ -464,6 +512,29 @@ ${name}` }],
         if (item) { setActiveItemId(item.id); setActiveSlideId(item.slides[0]?.id ?? '') }
         break
       }
+      case 'deck': {
+        // Marked file → its own service item (added once), that page on air
+        const deck = speakerDecks.find(d => d.file === cmd.id)
+        if (!deck) break
+        const id   = DECK_PREFIX + deck.file
+        const item = items.find(i => i.id === id) ?? makeMediaItem(deckToMedia(deck), id)
+        if (!items.some(i => i.id === id)) setItems(prev => [...prev, item])
+        const slide = item.slides[cmd.page] ?? item.slides[0]!
+        setActiveItemId(id)
+        handleGoLiveSlide(slide.id)
+        break
+      }
+      case 'deckStep': {
+        // Only moves a Speaker presentation that is on air — never songs / verses
+        if (!isLive || !liveItem?.id.startsWith(DECK_PREFIX)) break
+        const idx  = liveItem.slides.findIndex(s => s.id === liveSlideId)
+        const next = liveItem.slides[idx + cmd.delta]
+        if (next) { setActiveItemId(liveItem.id); handleGoLiveSlide(next.id) }
+        break
+      }
+      case 'media':
+        void openLibraryMedia(cmd.file).catch(() => {})
+        break
       case 'quick':
         if (cmd.text && cmd.label) handleQuickLaunch(cmd.text, cmd.label, cmd.version)
         break

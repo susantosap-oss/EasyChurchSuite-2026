@@ -22,6 +22,14 @@ interface Stored { port: number; keys: Record<RemoteRole, string> }
 
 const PREFERRED_PORT = 3902
 const MAX_BODY = 16 * 1024
+/** The Speaker may only open / step the presentations the operator marked for it */
+const SPEAKER_COMMANDS = new Set(['deck', 'deckStep'])
+/** Pictures phones may load through the remote: rendered presentation pages and library media */
+const IMAGE_PATH = /^\/api\/(slides|media)\/file\/[^?#]+$/
+/** Pass-through service worker: no offline cache (the remote is live-only), but it makes the page installable */
+const SERVICE_WORKER = "self.addEventListener('install',function(){self.skipWaiting()});" +
+  "self.addEventListener('activate',function(e){e.waitUntil(self.clients.claim())});" +
+  "self.addEventListener('fetch',function(){});"
 
 const newKey = () => crypto.randomBytes(9).toString('base64url')
 
@@ -52,6 +60,8 @@ export class RemoteServer {
     private readonly onClientsChanged: (clients: RemoteInfo['clients']) => void,
     /** GET a path on the app's local server (only the whitelisted Bible lookups below) */
     private readonly lookup: (path: string) => Promise<string>,
+    /** Stream a file from the app's local server to the phone (only IMAGE_PATH) */
+    private readonly proxy: (path: string, res: http.ServerResponse) => void,
   ) {
     this.stored = this.load()
   }
@@ -137,6 +147,11 @@ export class RemoteServer {
       res.end(body)
     }
 
+    if (req.method === 'GET' && url.pathname === '/sw.js') {
+      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store', 'Service-Worker-Allowed': '/' })
+      return res.end(SERVICE_WORKER)
+    }
+
     if (req.method === 'GET' && url.pathname === '/icon.png') {
       if (!this.iconPng) return send(404, 'text/plain', 'no icon')
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' })
@@ -157,13 +172,17 @@ export class RemoteServer {
       return send(200, 'application/manifest+json', JSON.stringify({
         name: role === 'operator' ? 'EasyChurch Operator' : 'EasyChurch Speaker',
         short_name: role === 'operator' ? 'Operator' : 'Speaker',
+        id: `/${role}`,
         start_url: `/r?k=${encodeURIComponent(key)}`,
         scope: '/',
         display: 'standalone',
-        orientation: role === 'speaker' ? 'any' : 'portrait',
+        orientation: 'landscape',
         background_color: '#0f172a',
         theme_color: '#0f172a',
-        icons: [{ src: '/icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' }],
+        icons: [
+          { src: '/icon.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icon.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        ],
       }))
     }
 
@@ -182,30 +201,41 @@ export class RemoteServer {
       return
     }
 
-    // Operator Bible search — read-only, two fixed endpoints of the app's API
-    if (req.method === 'GET' && (url.pathname === '/bible' || url.pathname === '/versions')) {
+    // Operator Bible search + media list — read-only, fixed endpoints of the app's API
+    if (req.method === 'GET' && (url.pathname === '/bible' || url.pathname === '/versions' || url.pathname === '/media')) {
       if (role !== 'operator') return send(403, 'application/json', '{"error":"speaker is read-only"}')
       const q = (url.searchParams.get('q') ?? '').slice(0, 80)
       const v = (url.searchParams.get('v') ?? 'TB').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 16) || 'TB'
-      const path = url.pathname === '/bible'
-        ? `/api/quick-search/?q=${encodeURIComponent(q)}&v=${encodeURIComponent(v)}`
-        : '/api/bible/versions/'
+      const path = url.pathname === '/bible'  ? `/api/quick-search/?q=${encodeURIComponent(q)}&v=${encodeURIComponent(v)}`
+                 : url.pathname === '/media'  ? '/api/media/'
+                 : '/api/bible/versions/'
       this.lookup(path)
         .then(body => send(200, 'application/json', body))
         .catch(() => send(502, 'application/json', '{"found":false,"error":"Aplikasi tidak merespons"}'))
       return
     }
 
+    // Presentation pages / images for the live view and preview (both roles)
+    if (req.method === 'GET' && url.pathname === '/img') {
+      const path = url.searchParams.get('u') ?? ''
+      if (!IMAGE_PATH.test(path) || path.includes('..')) return send(400, 'text/plain', 'bad path')
+      return this.proxy(path, res)
+    }
+
     if (req.method === 'POST' && url.pathname === '/command') {
-      if (role !== 'operator') return send(403, 'application/json', '{"error":"speaker is read-only"}')
       let body = ''
       req.on('data', chunk => {
         body += chunk
         if (body.length > MAX_BODY) req.destroy()
       })
       req.on('end', () => {
-        try { this.onCommand(JSON.parse(body)); send(200, 'application/json', '{"ok":true}') }
-        catch { send(400, 'application/json', '{"error":"bad command"}') }
+        let cmd: { type?: unknown }
+        try { cmd = JSON.parse(body) as { type?: unknown } } catch { return send(400, 'application/json', '{"error":"bad command"}') }
+        if (role === 'speaker' && !SPEAKER_COMMANDS.has(String(cmd?.type))) {
+          return send(403, 'application/json', '{"error":"speaker may only control its own presentations"}')
+        }
+        this.onCommand(cmd)
+        send(200, 'application/json', '{"ok":true}')
       })
       return
     }

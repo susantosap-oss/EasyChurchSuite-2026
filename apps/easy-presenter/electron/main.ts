@@ -302,6 +302,15 @@ function startRemote() {
         res.on('end', () => resolve(body))
       }).on('error', reject)
     }),
+    (path, out) => {
+      http.get(baseUrl + path, res => {
+        out.writeHead(res.statusCode ?? 502, {
+          'Content-Type': res.headers['content-type'] ?? 'application/octet-stream',
+          'Cache-Control': 'max-age=3600',
+        })
+        res.pipe(out)
+      }).on('error', () => { out.writeHead(502); out.end() })
+    },
   )
   remote.start().then(() => remote?.setSnapshot(lastRemoteState)).catch(() => { remote = null })
 }

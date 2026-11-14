@@ -86,7 +86,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     hardwareAcceleration: true, gpuRasterization: true, maxMemoryMB: 4096, lowSpecMode: false,
     video: { autoConvert: true, maxHeight: 1080, maxBitrateKbps: 12000, maxFps: 30, keepOriginal: false },
   },
-  ndi: { enabled: false, sourceName: 'EasyPresenter' },
+  ndi: { enabled: false, sourceName: 'EasyChurch Suite' },
 }
 
 /** Fill gaps from older saved JSON with defaults (one level deep per section) */

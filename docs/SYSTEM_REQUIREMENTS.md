@@ -1,6 +1,6 @@
-# EasyPresenter — Spesifikasi Sistem
+# EasyChurch Suite — Spesifikasi Sistem
 
-Spesifikasi PC untuk **menjalankan** EasyPresenter saat ibadah (bukan untuk development).
+Spesifikasi PC untuk **menjalankan** EasyChurch Suite saat ibadah (bukan untuk development).
 Aplikasi berbasis Electron 33 (Chromium 130) + server lokal Next.js + SQLite.
 
 ## Ringkasan

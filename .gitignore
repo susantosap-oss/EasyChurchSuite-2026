@@ -19,3 +19,5 @@ data/backgrounds/
 data/slides/
 dist-electron/
 data/media/
+.next-prod/
+release/

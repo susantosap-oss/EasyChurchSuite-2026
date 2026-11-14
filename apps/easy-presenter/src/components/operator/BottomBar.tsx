@@ -4,7 +4,7 @@ export function BottomBar() {
   return (
     <div className="h-10 border-t border-surface-light bg-surface-mid flex items-center px-4 gap-4 flex-shrink-0">
       <div className="flex items-center gap-2 text-xs text-slate-400">
-        <span className="font-medium text-white">EasyPresenter</span>
+        <span className="font-medium text-white">EasyChurch Suite</span>
         <span>v0.1.0</span>
       </div>
       <div className="flex-1" />

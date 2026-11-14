@@ -37,7 +37,7 @@ export function getPresenterDb(): DbInstance {
   const dbPath = resolveDbPath()
   if (!existsSync(dbPath)) {
     throw new Error(
-      `[EasyPresenter] Database not found at ${dbPath}.\n` +
+      `[EasyChurch Suite] Database not found at ${dbPath}.\n` +
       `Run: pnpm db:seed-demo  to create the demo database.`
     )
   }

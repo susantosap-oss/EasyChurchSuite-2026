@@ -20,53 +20,20 @@ import { DEFAULT_MEDIA_CONTROL } from './types'
 import type { ScriptureAddPayload } from './left/ScriptureSearch'
 import type { MediaFile } from './left/MediaLibrary'
 
-const DEMO_ITEMS: Omit<ServiceItem, 'background' | 'textStyle'>[] = [
-  { id: '1', type: 'song', title: 'Besar Kuasa-Mu', subtitle: 'Paul Baloche', slides: [
-    { id: 's1', label: 'Verse 1', text: 'Besar kuasa-Mu ya Tuhan\nTiada yang seperti Engkau' },
-    { id: 's2', label: 'Chorus',  text: 'Kau Tuhan yang menyelamatkan\nKau Tuhan yang memulihkan' },
-    { id: 's3', label: 'Verse 2', text: 'Tiada yang dapat membandingkan\nKebesaran nama-Mu' },
-    { id: 's4', label: 'Chorus',  text: 'Kau Tuhan yang menyelamatkan\nKau Tuhan yang memulihkan' },
-    { id: 's5', label: 'Bridge',  text: 'Hallelujah, hallelujah\nKemuliaan bagi-Mu Tuhan' },
-  ]},
-  { id: '2', type: 'scripture', title: 'Yohanes 3:16', subtitle: 'Terjemahan Baru', slides: [
-    { id: 'v1', label: 'Yoh 3:16', text: 'Karena begitu besar kasih Allah akan dunia ini, sehingga Ia telah mengaruniakan Anak-Nya yang tunggal' },
-    { id: 'v2', label: 'Yoh 3:16', text: 'supaya setiap orang yang percaya kepada-Nya tidak binasa, melainkan beroleh hidup yang kekal.' },
-    { id: 'v3', label: 'Referensi', text: 'Yohanes 3:16\nTerjemahan Baru (TB)' },
-  ]},
-  { id: '3', type: 'song', title: 'Yesus Kekuatan Hidupku', subtitle: 'JPCC Worship', slides: [
-    { id: 'j1', label: 'Verse 1', text: 'Yesus kekuatan hidupku\nYesus cahaya jiwaku' },
-    { id: 'j2', label: 'Chorus',  text: 'Kau sumber hidupku\nTempat kuberlindung' },
-    { id: 'j3', label: 'Verse 2', text: 'Dalam segala keadaan\nKupercaya pada-Mu Tuhan' },
-  ]},
-  { id: '4', type: 'scripture', title: 'Mazmur 23:1-6', subtitle: 'Terjemahan Baru', slides: [
-    { id: 'm1', label: 'Mzm 23:1', text: 'TUHAN adalah gembalaku, takkan kekurangan aku.' },
-    { id: 'm2', label: 'Mzm 23:2', text: 'Ia membaringkan aku di padang yang berumput hijau; Ia membimbing aku ke air yang tenang.' },
-    { id: 'm3', label: 'Mzm 23:3', text: 'Ia menyegarkan jiwaku. Ia menuntun aku di jalan yang benar oleh karena nama-Nya.' },
-  ]},
-  { id: '5', type: 'announcement', title: 'Pengumuman Jemaat', subtitle: '', slides: [
-    { id: 'a1', label: 'Slide 1', text: 'Ibadah Doa & Puasa\nSetiap Kamis, Pkl 19.00 WIB' },
-    { id: 'a2', label: 'Slide 2', text: 'Persekutuan Pemuda\nSabtu, 15 Nov 2026 · Pkl 17.00' },
-  ]},
-  { id: '6', type: 'song', title: 'Bapa Engkau Sungguh Baik', subtitle: 'True Worshippers', slides: [
-    { id: 'b1', label: 'Verse 1', text: 'Bapa Engkau sungguh baik\nKasih-Mu melimpah padaku' },
-    { id: 'b2', label: 'Chorus',  text: 'Kubersyukur, kubersyukur\nAtas segala yang Kau beri' },
-  ]},
-]
-
-function makeItems(): ServiceItem[] {
-  return DEMO_ITEMS.map(item => ({
-    ...item,
-    background: item.type === 'song' ? DEFAULT_SONG_BG : DEFAULT_SCRIPTURE_BG,
-    textStyle:  { ...DEFAULT_TEXT_STYLE },
-  }))
+// Shown while the Urutan Ibadah is empty; never part of `items`, so edits to it are no-ops
+const EMPTY_ITEM: ServiceItem = {
+  id: '__empty__', type: 'announcement', title: '', subtitle: '',
+  slides: [{ id: '__empty_s__', label: '', text: '' }],
+  background: DEFAULT_SCRIPTURE_BG,
+  textStyle: DEFAULT_TEXT_STYLE,
 }
 
 interface QuickSlide { text: string; label: string }
 
 export function UnifiedLayout() {
-  const [items, setItems]                 = useState<ServiceItem[]>(makeItems)
-  const [activeItemId, setActiveItemId]   = useState('1')
-  const [activeSlideId, setActiveSlideId] = useState('s1')
+  const [items, setItems]                 = useState<ServiceItem[]>([])
+  const [activeItemId, setActiveItemId]   = useState('')
+  const [activeSlideId, setActiveSlideId] = useState('')
   const [liveSlideId, setLiveSlideId]     = useState<string | null>(null)
   const [isBlank, setIsBlank]             = useState(false)
   const [isClearText, setIsClearText]     = useState(false)
@@ -80,7 +47,8 @@ export function UnifiedLayout() {
   const [mediaControl, setMediaControl]   = useState<MediaControl>(DEFAULT_MEDIA_CONTROL)
   const [mediaStatus, setMediaStatus]     = useState<MediaStatus>({ url: null, currentTime: 0, duration: 0, ended: false })
 
-  const activeItem  = items.find(i => i.id === activeItemId) ?? items[0]!
+  const activeItem  = items.find(i => i.id === activeItemId) ?? items[0] ?? EMPTY_ITEM
+  const isEmpty     = activeItem === EMPTY_ITEM
   const activeSlide = activeItem.slides.find(s => s.id === activeSlideId) ?? activeItem.slides[0]!
   const liveSlide   = items.flatMap(i => i.slides).find(s => s.id === liveSlideId) ?? null
   const liveItem    = items.find(i => i.slides.some(s => s.id === liveSlideId)) ?? null
@@ -193,6 +161,7 @@ ${name}` }],
   // ── Handlers ──
 
   const handleGoLive = () => {
+    if (isEmpty && !isLive) return
     if (isLive) {
       setIsLive(false)
       setQuickSlide(null)
@@ -374,13 +343,12 @@ ${name}` }],
 
   const handleDeleteItem = (id: string) => {
     setItems(prev => {
-      if (prev.length <= 1 && id !== '__quick__') return prev
       const newItems = prev.filter(i => i.id !== id)
       if (id === activeItemId) {
         const idx = prev.findIndex(i => i.id === id)
-        const next = newItems[Math.min(idx, newItems.length - 1)]!
-        setActiveItemId(next.id)
-        setActiveSlideId(next.slides[0]!.id)
+        const next = newItems[Math.min(idx, newItems.length - 1)]
+        setActiveItemId(next?.id ?? '')
+        setActiveSlideId(next?.slides[0]?.id ?? '')
       }
       if (id === liveItem?.id) {
         setIsLive(false)
@@ -446,6 +414,15 @@ ${name}` }],
           onSceneSaved={setCurrentScene}
         />
 
+        {isEmpty ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 min-w-0 text-center px-6"
+            style={{ background: '#0f1117' }}>
+            <div className="text-sm font-medium" style={{ color: '#94a3b8' }}>Urutan Ibadah masih kosong</div>
+            <div className="text-xs" style={{ color: '#475569' }}>
+              Tambahkan lagu, ayat, atau media dari Pustaka di kiri — atau buka Scene yang sudah disimpan.
+            </div>
+          </div>
+        ) : (
         <CenterPanel
           item={activeItem}
           activeSlideId={activeSlideId}
@@ -465,8 +442,10 @@ ${name}` }],
           mediaStatus={mediaStatus}
           onMediaControl={updateMediaControl}
         />
+        )}
 
         <RightPanel
+          isEmpty={isEmpty}
           liveSlide={effectiveLiveSlide}
           isBlank={isBlank}
           isLive={isLive}
@@ -488,7 +467,7 @@ ${name}` }],
 
       <StatusBar
         item={activeItem}
-        slide={quickSlide ? { id: '__quick__', label: quickSlide.label, text: quickSlide.text } : activeSlide}
+        slide={quickSlide ? { id: '__qs__', label: quickSlide.label, text: quickSlide.text } : activeSlide}
         liveSlideId={quickSlide ? '__quick__' : liveSlideId}
         isLive={isLive}
       />

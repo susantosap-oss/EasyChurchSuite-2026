@@ -131,7 +131,7 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
             </p>
             <p>
               <span style={{ color: '#f1f5f9' }}>.json</span>
-              {' '}— format standar EasyPresenter (lihat contoh di atas)
+              {' '}— format standar EasyChurch Suite (lihat contoh di atas)
             </p>
             <p style={{ color: '#374151' }}>Lagu dengan judul yang sama dilewati (tidak duplikat)</p>
           </div>

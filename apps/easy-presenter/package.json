@@ -5,7 +5,9 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently \"next dev -p 3001\" \"wait-on http://localhost:3001 && npm run build:electron && electron .\"",
-    "build": "next build && npm run build:electron && electron-builder",
+    "build": "node scripts/pack.cjs",
+    "build:seed": "node scripts/make-seed.cjs",
+    "build:icon": "electron scripts/make-icon.cjs",
     "type-check": "tsc --noEmit",
     "lint": "next lint",
     "build:electron": "tsc -p tsconfig.electron.json",

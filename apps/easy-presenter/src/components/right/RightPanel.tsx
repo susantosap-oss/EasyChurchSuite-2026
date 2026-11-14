@@ -17,6 +17,8 @@ interface Props {
   onBlank: () => void
   onGoLive: () => void
   activeItem: ServiceItem
+  /** Urutan Ibadah is empty — activeItem is only a placeholder */
+  isEmpty: boolean
   liveBackground: SlideBackground
   liveTextStyle: TextStyle
   liveMediaUrl?: string
@@ -32,7 +34,7 @@ export function RightPanel(props: Props) {
   const {
     activeItem, liveBackground, liveTextStyle, liveSlide,
     liveMediaUrl, liveMediaType,
-    onUpdateBackground, onUpdateTextStyle,
+    onUpdateBackground, onUpdateTextStyle, isEmpty,
     ...panelProps
   } = props
 
@@ -41,10 +43,10 @@ export function RightPanel(props: Props) {
       className="flex flex-col flex-shrink-0 overflow-hidden"
       style={{ width: 300, height: '100%', borderLeft: '1px solid #2a3347', background: '#0f1117' }}
     >
-      {/* ── OUTPUT — top 50% ── */}
+      {/* ── OUTPUT — as tall as its content (max 50%), the rest goes to Format / Studio ── */}
       <div
         className="flex flex-col overflow-hidden"
-        style={{ flex: '0 0 50%', borderBottom: '1px solid #2a3347' }}
+        style={{ flex: '0 0 auto', maxHeight: '50%', borderBottom: '1px solid #2a3347' }}
       >
         {/* Header */}
         <div
@@ -77,7 +79,7 @@ export function RightPanel(props: Props) {
         </div>
       </div>
 
-      {/* ── BOTTOM TABS: Format | Studio — bottom 50% ── */}
+      {/* ── BOTTOM TABS: Format | Studio — remaining height ── */}
       <div className="flex flex-col flex-1 overflow-hidden">
         <div
           className="flex items-center px-3 h-8 gap-1 flex-shrink-0"
@@ -106,7 +108,12 @@ export function RightPanel(props: Props) {
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col">
-          {tab === 'format' && (
+          {tab === 'format' && isEmpty && (
+            <div className="flex-1 flex items-center justify-center px-6 text-center text-xs" style={{ color: '#475569' }}>
+              Pilih item di Urutan Ibadah untuk mengatur background dan teks.
+            </div>
+          )}
+          {tab === 'format' && !isEmpty && (
             <FormatPanel
               background={activeItem.background}
               textStyle={activeItem.textStyle}

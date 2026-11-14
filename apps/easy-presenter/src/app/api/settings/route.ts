@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPresenterDb } from '@/lib/db.server'
 
+// Reads live data — never prerender at build time
+export const dynamic = 'force-dynamic'
+
 const KEY = 'presenter.settings'
 
 /** App settings (Settings ⚙) — one JSON document in app_settings */

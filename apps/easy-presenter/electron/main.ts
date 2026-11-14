@@ -1,10 +1,12 @@
-import { app, BrowserWindow, screen, ipcMain, type Display } from 'electron'
-import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { execFile } from 'child_process'
-import squirrelStartup from 'electron-squirrel-startup'
+import { app, BrowserWindow, screen, ipcMain, dialog, type Display } from 'electron'
+import { join, dirname } from 'path'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, createWriteStream } from 'fs'
+import { execFile, spawn, type ChildProcess } from 'child_process'
+import http from 'http'
+import net from 'net'
 
-if (squirrelStartup) app.quit()
+// One running instance only — a second copy would start a second server on the same data
+if (!app.requestSingleInstanceLock()) app.quit()
 
 // ── Native settings (written by the renderer via Settings ⚙, read before app start) ──
 
@@ -62,8 +64,77 @@ let operatorWindow: BrowserWindow | null = null
 const outputWindows = new Map<1 | 2, BrowserWindow>()
 
 const isDev = !app.isPackaged
-const NEXT_URL = 'http://localhost:3001'
-const DIST_PATH = join(__dirname, '../out')
+const DEV_URL = 'http://localhost:3001'
+let baseUrl = DEV_URL   // installed app: the bundled server on 127.0.0.1:<free port>
+let serverProcess: ChildProcess | null = null
+
+// ── Bundled server (installed app) ──
+
+function findFreePort(preferred: number): Promise<number> {
+  return new Promise(resolve => {
+    const srv = net.createServer()
+    srv.once('error', () => {
+      const any = net.createServer()
+      any.listen(0, '127.0.0.1', () => {
+        const port = (any.address() as net.AddressInfo).port
+        any.close(() => resolve(port))
+      })
+    })
+    srv.listen(preferred, '127.0.0.1', () => srv.close(() => resolve(preferred)))
+  })
+}
+
+function waitForHttp(url: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  return new Promise((resolve, reject) => {
+    const attempt = () => {
+      http.get(url, res => { res.resume(); resolve() })
+        .on('error', () => {
+          if (Date.now() > deadline) reject(new Error('Server tidak merespons'))
+          else setTimeout(attempt, 300)
+        })
+    }
+    attempt()
+  })
+}
+
+/** Start the bundled Next.js server with Electron's Node; data lives in %APPDATA%/EasyChurch Suite/data */
+async function startBundledServer(): Promise<string> {
+  const resources = process.resourcesPath
+  const serverJs  = join(resources, 'server', 'apps', 'easy-presenter', 'server.js')
+  const dataDir   = join(app.getPath('userData'), 'data')
+  const dbPath    = join(dataDir, 'easy_bible.db')
+  mkdirSync(dataDir, { recursive: true })
+  // First run: copy the starter database (TB + KJV) out of the read-only install folder
+  if (!existsSync(dbPath)) copyFileSync(join(resources, 'seed', 'easy_bible.db'), dbPath)
+
+  const port = await findFreePort(3901)
+  const log  = createWriteStream(join(app.getPath('userData'), 'server.log'), { flags: 'w' })
+  serverProcess = spawn(process.execPath, [serverJs], {
+    cwd: dirname(serverJs),
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      NODE_ENV: 'production',
+      PORT: String(port),
+      HOSTNAME: '127.0.0.1',
+      DB_PATH: dbPath,
+      NODE_OPTIONS: `--max-old-space-size=${native.performance.maxMemoryMB}`,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+  })
+  serverProcess.stdout?.pipe(log)
+  serverProcess.stderr?.pipe(log)
+
+  const url = `http://127.0.0.1:${port}`
+  await waitForHttp(`${url}/api/settings/`, 45_000)
+  return url
+}
+
+const SPLASH = 'data:text/html;charset=utf-8,' + encodeURIComponent(
+  '<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;' +
+  'background:#0f172a;color:#94a3b8;font-family:Segoe UI,sans-serif">Memulai EasyChurch Suite…</body>')
 
 const webPreferences = () => ({
   nodeIntegration: false,
@@ -82,17 +153,12 @@ function createOperatorWindow() {
     titleBarStyle: 'hiddenInset',
     frame: process.platform !== 'darwin',
     webPreferences: webPreferences(),
-    title: 'EasyPresenter',
+    title: 'EasyChurch Suite',
     show: false,
   })
 
   operatorWindow.once('ready-to-show', () => operatorWindow!.maximize())
-
-  if (isDev) {
-    operatorWindow.loadURL(NEXT_URL)
-  } else {
-    operatorWindow.loadFile(join(DIST_PATH, 'index.html'))
-  }
+  operatorWindow.loadURL(isDev ? DEV_URL : SPLASH)
 
   operatorWindow.on('closed', () => {
     operatorWindow = null
@@ -114,6 +180,9 @@ function pickDisplay(n: 1 | 2, wantedId: number | null): Display | null {
 
 function openOutput(n: 1 | 2, displayId: number | null) {
   const display = pickDisplay(n, displayId)
+  // Single screen (laptop without projector): a floating output window would cover the
+  // operator UI, and the OUTPUT preview in the right panel already shows the same thing
+  if (!display) { outputWindows.get(n)?.close(); return }
   let win = outputWindows.get(n)
 
   if (!win || win.isDestroyed()) {
@@ -121,12 +190,11 @@ function openOutput(n: 1 | 2, displayId: number | null) {
       backgroundColor: '#000000',
       frame: false,
       webPreferences: webPreferences(),
-      title: `EasyPresenter Output ${n}`,
+      title: `EasyChurch Suite Output ${n}`,
       show: false,
       skipTaskbar: true,
     })
-    if (isDev) win.loadURL(`${NEXT_URL}/output/?display=${n}`)
-    else win.loadFile(join(DIST_PATH, 'output/index.html'), { query: { display: String(n) } })
+    win.loadURL(`${baseUrl}/output/?display=${n}`)
     const created = win
     win.once('ready-to-show', () => created.show())
     win.on('closed', () => { if (outputWindows.get(n) === created) outputWindows.delete(n) })
@@ -134,14 +202,8 @@ function openOutput(n: 1 | 2, displayId: number | null) {
   }
 
   win.setFullScreen(false)
-  if (display) {
-    win.setBounds(display.bounds)
-    win.setFullScreen(true)
-  } else {
-    // Single-screen laptop: small preview window on the operator screen
-    const p = screen.getPrimaryDisplay().workArea
-    win.setBounds({ x: p.x + p.width - 500 * n, y: p.y + p.height - 300, width: 480, height: 270 })
-  }
+  win.setBounds(display.bounds)
+  win.setFullScreen(true)
 }
 
 function applyOutputs(s: NativeSettings) {
@@ -227,8 +289,25 @@ ipcMain.on('app:relaunch', () => {
   app.exit(0)
 })
 
-app.whenReady().then(() => {
+app.on('second-instance', () => {
+  if (operatorWindow) { if (operatorWindow.isMinimized()) operatorWindow.restore(); operatorWindow.focus() }
+})
+
+app.whenReady().then(async () => {
   createOperatorWindow()
+  if (!isDev) {
+    try {
+      baseUrl = await startBundledServer()
+      await operatorWindow?.loadURL(baseUrl)
+    } catch (err) {
+      dialog.showErrorBox('EasyChurch Suite gagal mulai',
+        `${err instanceof Error ? err.message : String(err)}
+
+Log: ${join(app.getPath('userData'), 'server.log')}`)
+      app.quit()
+      return
+    }
+  }
   applyOutputs(native)
 
   // Monitor plugged / unplugged → re-place output windows
@@ -240,6 +319,8 @@ app.whenReady().then(() => {
     if (!operatorWindow) createOperatorWindow()
   })
 })
+
+app.on('will-quit', () => { serverProcess?.kill() })
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

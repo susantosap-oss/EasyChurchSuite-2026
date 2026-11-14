@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { getVersions } from '@easychurch/bible-queries'
 import { getPresenterDb } from '@/lib/db.server'
 
+// Reads live data — never prerender at build time
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const db = getPresenterDb()

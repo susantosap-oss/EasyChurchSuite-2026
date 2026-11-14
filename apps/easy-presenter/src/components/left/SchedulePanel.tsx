@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import type { ServiceItem } from '../types'
 
 const TYPE_CONFIG = {
@@ -18,6 +19,20 @@ interface Props {
 }
 
 export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onDelete }: Props) {
+  // Deleting the item that is on air takes it off air — ask with a second click first
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!confirmId) return
+    const t = setTimeout(() => setConfirmId(null), 3000)
+    return () => clearTimeout(t)
+  }, [confirmId])
+
+  const handleDelete = (id: string) => {
+    if (id === liveItemId && confirmId !== id) { setConfirmId(id); return }
+    setConfirmId(null)
+    onDelete(id)
+  }
+
   return (
     <div className="flex-1 overflow-y-auto py-1.5 px-1.5 space-y-0.5">
       {service.map((item, idx) => {
@@ -87,17 +102,16 @@ export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onD
                 </span>
               )}
 
-              {/* Delete button — visible on hover, hidden when live */}
-              {!isLive && (
-                <button
-                  onClick={e => { e.stopPropagation(); onDelete(item.id) }}
-                  title="Hapus dari urutan ibadah"
-                  className="flex-shrink-0 w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ background: '#3b1515', color: '#f87171', fontSize: 11 }}
-                >
-                  ×
-                </button>
-              )}
+              {/* Delete — always visible (dim until hover); the live item needs a confirming second click */}
+              <button
+                onClick={e => { e.stopPropagation(); handleDelete(item.id) }}
+                title={isLive ? 'Hapus dari urutan ibadah (sedang LIVE — klik 2×)' : 'Hapus dari urutan ibadah'}
+                className={`flex-shrink-0 h-5 rounded flex items-center justify-center transition-opacity ${
+                  confirmId === item.id ? 'px-1.5 opacity-100' : 'w-5 opacity-40 group-hover:opacity-100'}`}
+                style={{ background: '#3b1515', color: '#f87171', fontSize: confirmId === item.id ? 10 : 11 }}
+              >
+                {confirmId === item.id ? 'Hapus?' : '×'}
+              </button>
             </div>
           </div>
         )

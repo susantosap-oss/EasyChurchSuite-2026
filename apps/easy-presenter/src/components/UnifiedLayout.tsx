@@ -355,20 +355,21 @@ ${name}` }],
   }
 
   const handleDeleteItem = (id: string) => {
-    setItems(prev => {
-      const newItems = prev.filter(i => i.id !== id)
-      if (id === activeItemId) {
-        const idx = prev.findIndex(i => i.id === id)
-        const next = newItems[Math.min(idx, newItems.length - 1)]
-        setActiveItemId(next?.id ?? '')
-        setActiveSlideId(next?.slides[0]?.id ?? '')
-      }
-      if (id === liveItem?.id) {
-        setIsLive(false)
-        setLiveSlideId(null)
-      }
-      return newItems
-    })
+    const idx = items.findIndex(i => i.id === id)
+    if (idx < 0) return
+    const newItems = items.filter(i => i.id !== id)
+    setItems(newItems)
+    if (id === activeItem.id) {
+      const next = newItems[Math.min(idx, newItems.length - 1)]
+      setActiveItemId(next?.id ?? '')
+      setActiveSlideId(next?.slides[0]?.id ?? '')
+    }
+    // Removing what is on air takes it off air
+    if (id === liveItem?.id || (id === '__quick__' && quickSlide)) {
+      setIsLive(false)
+      setLiveSlideId(null)
+      setQuickSlide(null)
+    }
   }
 
   const handleLoadScene = (loadedItems: ServiceItem[], scene: SceneRef) => {

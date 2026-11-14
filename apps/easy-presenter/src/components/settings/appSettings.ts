@@ -60,7 +60,7 @@ export interface AppSettings {
   display2: DisplaySettings
   /** Default text animation per song group on Display 1 (null = none) */
   animations: { verse: TextAnimation | null; chorus: TextAnimation | null; bridge: TextAnimation | null }
-  /** Bible verses on the output: prefix the reference, e.g. "Yoh 3:16 : Karena begitu besar…" */
+  /** Bible verses on the output: reference line above the quoted verse, e.g. Yoh 3:16 / “Karena begitu besar…” */
   scripture: { showReference: boolean }
   output: {
     display1: OutputTarget

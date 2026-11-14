@@ -236,7 +236,7 @@ function TextTab({ draft, patchText, setShowReference }: {
           )
         })}
       </div>
-      <Section title="Ayat Alkitab" note="Referensi ditampilkan di depan teks ayat pada output, contoh: Yoh 3:16 : Karena begitu besar kasih Allah…">
+      <Section title="Ayat Alkitab" note="Referensi ditampilkan di atas teks ayat pada output, contoh: Yoh 3:16 lalu di baris berikutnya “Karena begitu besar kasih Allah…”">
         <Toggle on={draft.scripture.showReference} onChange={setShowReference} label="Tampilkan kitab, pasal & ayat" />
       </Section>
       {fontFor && (

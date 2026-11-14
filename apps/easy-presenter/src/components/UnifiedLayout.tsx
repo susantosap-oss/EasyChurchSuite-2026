@@ -57,10 +57,10 @@ export function UnifiedLayout() {
 
   const baseLiveSlide = isLive && !isBlank ? (liveSlide ?? activeSlide) : null
   const liveIsScripture = quickSlide != null || (liveItem ?? activeItem).type === 'scripture'
-  // Scripture on the output: "Yoh 3:16 : <verse>" (Settings ⚙ → Teks → Ayat Alkitab)
+  // Scripture on the output: reference on its own line above the quoted verse (Settings ⚙ → Teks → Ayat Alkitab)
   const withReference = (s: Slide): Slide =>
     liveIsScripture && appSettings.scripture.showReference && s.label && s.text
-      ? { ...s, text: `${s.label} : ${s.text}` }
+      ? { ...s, text: `${s.label}\n“${s.text}”` }
       : s
   const effectiveLiveSlide: Slide | null = quickSlide
     ? withReference({ id: '__quick__', label: quickSlide.label, text: quickSlide.text })

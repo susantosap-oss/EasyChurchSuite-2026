@@ -136,10 +136,9 @@ export function CenterPanel({
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return
 
       // Song-only shortcuts
-      if (isSong) {
-        if (e.ctrlKey && e.key === 'l') { e.preventDefault(); onGoLiveSlide(activeSlideId); return }
-        if (e.ctrlKey && e.key === 'c') { e.preventDefault(); onClearLive(); return }
-      }
+      if (isSong && e.ctrlKey && e.key === 'l') { e.preventDefault(); onGoLiveSlide(activeSlideId); return }
+      // Clear text (background stays) — songs and scripture
+      if ((isSong || isScripture) && e.ctrlKey && e.key === 'c') { e.preventDefault(); onClearLive(); return }
 
       if (e.ctrlKey || e.altKey || e.metaKey) return
 
@@ -232,8 +231,8 @@ export function CenterPanel({
           </span>
         )}
 
-        {/* Clear Text — only for songs */}
-        {isSong && (
+        {/* Clear Text — songs and scripture */}
+        {(isSong || isScripture) && (
           <button
             onClick={onClearLive}
             title="Clear teks output, background tetap (Ctrl+C)"

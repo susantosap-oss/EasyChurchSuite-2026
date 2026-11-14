@@ -1,5 +1,5 @@
 // Application-wide presenter defaults (Settings ⚙). Stored in app_settings as JSON.
-import type { SlideBackground, TextAnimation, TextStyle, ServiceItem, VerticalPosition } from '../types'
+import type { SlideBackground, TextAnimation, TextStyle, ServiceItem, VerticalPosition, ItemType } from '../types'
 import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, DEFAULT_TEXT_ANIMATION } from '../types'
 
 export type TextPosition = 'top' | 'center' | 'bottom'
@@ -27,10 +27,15 @@ export interface DisplaySettings {
 export type Display2Mode = 'custom' | 'mirror'
 
 /**
- * Chroma key for a video switcher (ATEM): every background on that output (song, scripture,
- * blank, around media) becomes the key colour, so the keyer lays only the text over the camera.
+ * Chroma key for a video switcher (ATEM). For the item types it is set for, the slide background
+ * becomes the key colour so the keyer lays only the text over the camera; other items keep their
+ * own background. Blank / nothing live / around media is the key colour too, so the running text
+ * can still be keyed.
  */
 export type ChromaKey = 'off' | 'green' | 'blue'
+
+/** Which live items get the key-colour background (and the subtitle position) */
+export type ChromaTarget = 'song' | 'scripture' | 'both'
 
 export const CHROMA_COLORS: Record<Exclude<ChromaKey, 'off'>, string> = { green: '#00FF00', blue: '#0000FF' }
 
@@ -38,13 +43,35 @@ export interface OutputTarget {
   enabled: boolean
   displayId: number | null   // Electron display id; null = auto (first secondary screen)
   chromaKey: ChromaKey
-  /** Force text to the bottom of the frame (lyrics / verses as subtitles over the camera) */
+  chromaFor: ChromaTarget
+  /** Keyed items: text forced to the bottom of the frame (subtitles over the camera) */
   subtitle: boolean
+  /** Subtitle font size, px @ 1920-wide design (replaces the item's own size while shown as subtitle) */
+  subtitleSize: number
 }
 
 /** Key colour for an output, or null when chroma key is off */
 export function chromaColor(t: OutputTarget): string | null {
   return t.chromaKey === 'off' ? null : CHROMA_COLORS[t.chromaKey]
+}
+
+/** Whether a live item of this type is keyed under the chosen target */
+export function chromaApplies(target: ChromaTarget, itemType: ItemType | null): boolean {
+  if (itemType === 'song')      return target === 'song' || target === 'both'
+  if (itemType === 'scripture') return target === 'scripture' || target === 'both'
+  return false
+}
+
+/** Older saved settings: subtitle was on/off or a per-type mode, and there was no chromaFor */
+function normalizeTarget<T extends OutputTarget>(def: T, raw: Partial<Record<keyof T, unknown>> | undefined): T {
+  const r = (raw ?? {}) as Record<string, unknown>
+  const merged = { ...def, ...r } as T
+  const sub = r.subtitle
+  const legacyFor = sub === 'song' || sub === 'scripture' || sub === 'both' ? sub : undefined
+  merged.subtitle  = sub === true || legacyFor !== undefined
+  merged.chromaFor = r.chromaFor === 'song' || r.chromaFor === 'scripture' || r.chromaFor === 'both'
+    ? r.chromaFor : (legacyFor ?? def.chromaFor)
+  return merged
 }
 
 export interface VideoLimits {
@@ -98,8 +125,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   animations: { verse: null, chorus: null, bridge: null },
   scripture: { showReference: true },
   output: {
-    display1: { enabled: true, displayId: null, chromaKey: 'off', subtitle: false },
-    display2: { enabled: false, displayId: null, mode: 'custom', chromaKey: 'off', subtitle: false },
+    display1: { enabled: true, displayId: null, chromaKey: 'off', chromaFor: 'both', subtitle: false, subtitleSize: 56 },
+    display2: { enabled: false, displayId: null, mode: 'custom', chromaKey: 'off', chromaFor: 'both', subtitle: false, subtitleSize: 56 },
   },
   performance: {
     hardwareAcceleration: true, gpuRasterization: true, maxMemoryMB: 4096, lowSpecMode: false,
@@ -121,8 +148,8 @@ export function normalizeSettings(raw: Partial<AppSettings> | null | undefined):
     animations: { ...d.animations, ...r.animations },
     scripture: { ...d.scripture, ...r.scripture },
     output: {
-      display1: { ...d.output.display1, ...r.output?.display1 },
-      display2: { ...d.output.display2, ...r.output?.display2 },
+      display1: normalizeTarget(d.output.display1, r.output?.display1),
+      display2: normalizeTarget(d.output.display2, r.output?.display2),
     },
     performance: { ...d.performance, ...r.performance, video: { ...d.performance.video, ...r.performance?.video } },
     ndi: { ...d.ndi, ...r.ndi },

@@ -1,7 +1,7 @@
 // Live output state broadcast from the operator window to output windows (/output?display=N).
 // BroadcastChannel works between same-origin windows — browser tabs and Electron windows alike.
 import type { ItemType, SlideBackground, TextStyle } from '@/components/types'
-import type { AppSettings } from '@/components/settings/appSettings'
+import type { AppSettings, ChromaTarget } from '@/components/settings/appSettings'
 
 export const OUTPUT_CHANNEL = 'easychurch-output'
 
@@ -25,15 +25,17 @@ export interface OutputState {
   /** Video sync: output windows follow the operator's master player (muted) */
   video: { playing: boolean; currentTime: number; loop: boolean } | null
   runningText: RunningText | null
-  /** Per output: chroma key colour replacing every background (null = off); subtitle = text forced to the bottom */
+  /** Per output chroma key: colour (null = off), which item types it keys, and whether keyed text goes to the bottom */
   key: {
-    display1: { color: string | null; subtitle: boolean }
-    display2: { color: string | null; subtitle: boolean }
+    display1: ChromaKeyState
+    display2: ChromaKeyState
   }
   display2: AppSettings['display2']
   display2Mode: AppSettings['output']['display2']['mode']
   lowSpec: boolean
 }
+
+export interface ChromaKeyState { color: string | null; for: ChromaTarget; subtitle: boolean; subtitleSize: number }
 
 export type OutputMessage =
   | { type: 'state'; state: OutputState }

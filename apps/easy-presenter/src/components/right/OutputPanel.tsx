@@ -20,7 +20,10 @@ interface Props {
   runningText: RunningText | null
   /** Display 1 chroma key colour (null = off) */
   chromaKey: string | null
+  /** The live item is one of the keyed types */
+  keyLive: boolean
   subtitle: boolean
+  subtitleSize: number
   mediaControl: MediaControl
   onMediaStatus: (status: MediaStatus) => void
   onNext: () => void
@@ -31,14 +34,16 @@ interface Props {
 
 export function OutputPanel({
   liveSlide, isBlank, isLive, background, textStyle,
-  liveMediaUrl, liveMediaType, runningText, chromaKey, subtitle, mediaControl, onMediaStatus,
+  liveMediaUrl, liveMediaType, runningText, chromaKey, keyLive, subtitle, subtitleSize, mediaControl, onMediaStatus,
   onNext, onPrev, onBlank, onGoLive,
 }: Props) {
   const showMedia = isLive && !isBlank && liveMediaUrl && liveMediaType
   const idleColor = chromaKey ?? '#000'
   // Mirror what Display 1 sends: key colour instead of the slide background, text at the bottom
-  const bg: SlideBackground = chromaKey ? { type: 'solid', color: chromaKey } : background
-  const style: TextStyle = subtitle ? { ...textStyle, verticalPosition: 'bottom' } : textStyle
+  const bg: SlideBackground = chromaKey && keyLive ? { type: 'solid', color: chromaKey } : background
+  const style: TextStyle = chromaKey && keyLive && subtitle
+    ? { ...textStyle, verticalPosition: 'bottom', fontSize: subtitleSize }
+    : textStyle
 
   return (
     <div className="flex flex-col flex-shrink-0">

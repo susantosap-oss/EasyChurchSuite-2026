@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { SlideCanvas } from '@/components/shared/SlideCanvas'
-import { textSettingsToStyle } from '@/components/settings/appSettings'
+import { textSettingsToStyle, chromaApplies } from '@/components/settings/appSettings'
 import { RunningTextOverlay } from '@/components/shared/RunningTextOverlay'
 import { openOutputChannel, type OutputMessage, type OutputState } from '@/lib/outputBus'
 import { setLowSpec } from '@/lib/perfMode'
@@ -66,11 +66,14 @@ export default function OutputPage() {
     else if (state.itemType === 'scripture') background = state.display2.scriptureBackground
   }
 
-  // Chroma key (ATEM): the key colour replaces every background so only the text stays
+  // Chroma key (ATEM): blank / empty areas are the key colour; keyed item types also lose their
+  // background (and go to the bottom in subtitle mode) so only the text lays over the camera
   const key = state?.key[`display${display}`]
   const idle = key?.color ?? '#000000'
-  if (key?.color) background = { type: 'solid', color: key.color }
-  if (key?.subtitle && textStyle) textStyle = { ...textStyle, verticalPosition: 'bottom' }
+  if (key?.color && chromaApplies(key.for, state?.itemType ?? null)) {
+    background = { type: 'solid', color: key.color }
+    if (key.subtitle && textStyle) textStyle = { ...textStyle, verticalPosition: 'bottom', fontSize: key.subtitleSize }
+  }
 
   return (
     <div className="w-screen h-screen flex items-center justify-center overflow-hidden" style={{ cursor: 'none', background: idle }}>

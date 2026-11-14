@@ -10,7 +10,7 @@ import { RightPanel } from './right/RightPanel'
 import { SlideEditModal } from './center/SlideEditModal'
 import { useBgLibrary } from './center/BackgroundPanels'
 import { useAppSettings } from './settings/useAppSettings'
-import { applyAppDefaults, defaultTextStyle, chromaColor } from './settings/appSettings'
+import { applyAppDefaults, defaultTextStyle, chromaColor, chromaApplies } from './settings/appSettings'
 import { SettingsModal } from './settings/SettingsModal'
 import { openOutputChannel, type OutputMessage, type OutputState, type RunningText } from '@/lib/outputBus'
 import type { ServiceItem, SlideBackground, TextStyle, Slide } from './types'
@@ -62,9 +62,11 @@ export function UnifiedLayout() {
     liveIsScripture && appSettings.scripture.showReference && s.label && s.text
       ? { ...s, text: `${s.label}\n“${s.text}”` }
       : s
-  const effectiveLiveSlide: Slide | null = quickSlide
-    ? withReference({ id: '__quick__', label: quickSlide.label, text: quickSlide.text })
-    : (isClearText && baseLiveSlide ? { ...baseLiveSlide, text: '' } : baseLiveSlide && withReference(baseLiveSlide))
+  const rawLiveSlide: Slide | null = quickSlide
+    ? { id: '__quick__', label: quickSlide.label, text: quickSlide.text }
+    : baseLiveSlide
+  // Clear text: empty text, the background stays on screen (quick verses too)
+  const effectiveLiveSlide: Slide | null = rawLiveSlide && (isClearText ? { ...rawLiveSlide, text: '' } : withReference(rawLiveSlide))
 
   const quickItem = items.find(i => i.id === '__quick__')
 
@@ -106,6 +108,8 @@ export function UnifiedLayout() {
   }, [])
 
   // ── Live state → output windows (/output?display=1|2) ──
+  const out1 = appSettings.output.display1
+  const out2 = appSettings.output.display2
   const outputState: OutputState = {
     blank: isBlank || !isLive,
     slide: effectiveLiveSlide ? { text: effectiveLiveSlide.text, image: effectiveLiveSlide.image } : null,
@@ -118,8 +122,8 @@ export function UnifiedLayout() {
       : null,
     runningText,
     key: {
-      display1: { color: chromaColor(appSettings.output.display1), subtitle: appSettings.output.display1.subtitle },
-      display2: { color: chromaColor(appSettings.output.display2), subtitle: appSettings.output.display2.subtitle },
+      display1: { color: chromaColor(out1), for: out1.chromaFor, subtitle: out1.subtitle, subtitleSize: out1.subtitleSize },
+      display2: { color: chromaColor(out2), for: out2.chromaFor, subtitle: out2.subtitle, subtitleSize: out2.subtitleSize },
     },
     display2: appSettings.display2,
     display2Mode: appSettings.output.display2.mode,
@@ -318,6 +322,7 @@ ${name}` }],
     setQuickSlide({ text, label })
     setIsLive(true)
     setIsBlank(false)
+    setIsClearText(false)   // a new verse always shows its text
     // Also show in CenterPanel (monitor view): add/replace a single reusable Quick item
     const qSlide = { id: '__qs__', label, text }
     setItems(prev => {
@@ -464,8 +469,10 @@ ${name}` }],
           isEmpty={isEmpty}
           runningText={runningText}
           onRunningText={setRunningText}
-          chromaKey={chromaColor(appSettings.output.display1)}
-          subtitle={appSettings.output.display1.subtitle}
+          chromaKey={chromaColor(out1)}
+          keyLive={chromaColor(out1) != null && chromaApplies(out1.chromaFor, outputState.itemType)}
+          subtitle={out1.subtitle}
+          subtitleSize={out1.subtitleSize}
           liveSlide={effectiveLiveSlide}
           isBlank={isBlank}
           isLive={isLive}

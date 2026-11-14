@@ -449,11 +449,27 @@ function OutputTab({ draft, setDraft }: { draft: AppSettings; setDraft: React.Di
                 onChange={v => setTarget(n, { chromaKey: v })} />
               {t.chromaKey !== 'off' && (
                 <div className="mt-2 space-y-2">
+                  <div>
+                    <p className="text-[10px] mb-1" style={{ color: C.muted }}>Chroma Key untuk</p>
+                    <Seg value={t.chromaFor}
+                      options={[{ id: 'song', label: 'Lagu' }, { id: 'scripture', label: 'Alkitab' }, { id: 'both', label: 'Keduanya' }]}
+                      onChange={v => setTarget(n, { chromaFor: v })} />
+                  </div>
                   <Toggle on={t.subtitle} onChange={v => setTarget(n, { subtitle: v })} label="Teks model subtitle (selalu di bawah)" />
+                  {t.subtitle && (
+                    <div>
+                      <p className="text-[10px] mb-1" style={{ color: C.muted }}>
+                        Ukuran font subtitle: <b style={{ color: '#fff' }}>{t.subtitleSize}px</b> (layar 1920)
+                      </p>
+                      <input type="range" min={24} max={120} step={2} value={t.subtitleSize}
+                        onChange={e => setTarget(n, { subtitleSize: Number(e.target.value) })} className="w-full" />
+                    </div>
+                  )}
                   <p className="text-[10px]" style={{ color: C.dim }}>
-                    Semua background lagu, ayat, Blank dan area kosong di sekitar media menjadi {t.chromaKey === 'green' ? 'hijau' : 'biru'} —
-                    samakan dengan warna key di ATEM. Di ATEM: program tetap di kamera, input PC dipasang sebagai
-                    Upstream Key → Chroma, lalu KEY ON AIR. Gambar & video media tetap menutupi kamera.
+                    {t.chromaFor === 'song' ? 'Lagu' : t.chromaFor === 'scripture' ? 'Ayat Alkitab' : 'Lagu & ayat Alkitab'} tampil
+                    dengan background {t.chromaKey === 'green' ? 'hijau' : 'biru'}; item lain tampil normal dengan background-nya.
+                    Blank / tidak ada yang Live juga {t.chromaKey === 'green' ? 'hijau' : 'biru'} agar running text tetap bisa di-key.
+                    Samakan warna dengan key di ATEM: program tetap di kamera, input PC sebagai Upstream Key → Chroma, lalu KEY ON AIR.
                   </p>
                 </div>
               )}

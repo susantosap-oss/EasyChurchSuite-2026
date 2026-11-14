@@ -22,9 +22,11 @@ interface Props {
   isEmpty: boolean
   runningText: RunningText | null
   onRunningText: (rt: RunningText | null) => void
-  /** Display 1 chroma key colour (null = off) and subtitle mode; the preview mirrors Display 1 */
+  /** Display 1 chroma key (the preview mirrors Display 1): colour, whether it keys the live item, subtitle */
   chromaKey: string | null
+  keyLive: boolean
   subtitle: boolean
+  subtitleSize: number
   liveBackground: SlideBackground
   liveTextStyle: TextStyle
   liveMediaUrl?: string
@@ -40,7 +42,7 @@ export function RightPanel(props: Props) {
   const {
     activeItem, liveBackground, liveTextStyle, liveSlide,
     liveMediaUrl, liveMediaType,
-    onUpdateBackground, onUpdateTextStyle, isEmpty, runningText, onRunningText, chromaKey, subtitle,
+    onUpdateBackground, onUpdateTextStyle, isEmpty, runningText, onRunningText, chromaKey, keyLive, subtitle, subtitleSize,
     ...panelProps
   } = props
 
@@ -83,7 +85,9 @@ export function RightPanel(props: Props) {
             liveMediaType={liveMediaType}
             runningText={runningText}
             chromaKey={chromaKey}
+            keyLive={keyLive}
             subtitle={subtitle}
+            subtitleSize={subtitleSize}
           />
         </div>
       </div>

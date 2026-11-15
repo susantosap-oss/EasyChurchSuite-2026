@@ -38,7 +38,44 @@ function serverFileToEntry(f: ServerBgFile): BgEntry {
 }
 
 function isVideoFile(f: File): boolean {
-  return f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name)
+  // .mkv / .avi / … are converted to MP4 by the server (needs FFmpeg)
+  return f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v|mkv|avi|wmv|mpe?g|flv|3gp|ts|mts|m2ts)$/i.test(f.name)
+}
+
+/** Background images never need more than the output resolution */
+const BG_MAX_W = 1920
+const BG_MAX_H = 1080
+
+/**
+ * Scale a large photo down to fit 1920×1080 before upload — a 24 MP phone photo costs ~100 MB of
+ * GPU memory on the output. Done in the browser so the EXIF rotation of phone photos is applied.
+ * GIFs (animation) and images that already fit are returned unchanged.
+ */
+async function downscaleImage(f: File): Promise<File> {
+  if (!f.type.startsWith('image/') || f.type === 'image/gif' || typeof createImageBitmap !== 'function') return f
+  let bmp: ImageBitmap | null = null
+  try {
+    bmp = await createImageBitmap(f, { imageOrientation: 'from-image' })
+    const scale = Math.min(BG_MAX_W / bmp.width, BG_MAX_H / bmp.height)
+    if (scale >= 1) return f
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return f
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(bmp, 0, 0, w, h)
+    // PNG keeps transparency; everything else becomes a high-quality JPEG
+    const type = f.type === 'image/png' ? 'image/png' : 'image/jpeg'
+    const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, type, 0.9))
+    if (!blob || blob.size >= f.size) return f
+    const name = f.name.replace(/\.[^.]+$/, '') + (type === 'image/png' ? '.png' : '.jpg')
+    return new File([blob], name, { type })
+  } catch {
+    return f
+  } finally {
+    bmp?.close()
+  }
 }
 
 function isBgFile(f: File): boolean {
@@ -49,10 +86,11 @@ function isBgFile(f: File): boolean {
  * Store a background file on the server so it survives reloads.
  * Falls back to a session-only blob URL when the server is unavailable.
  */
-export async function uploadBackgroundFile(f: File): Promise<{
+export async function uploadBackgroundFile(original: File): Promise<{
   url: string; kind: 'image' | 'video'; name: string; file?: string; persisted: boolean
 }> {
-  const kind = isVideoFile(f) ? 'video' : 'image'
+  const kind = isVideoFile(original) ? 'video' : 'image'
+  const f = kind === 'image' ? await downscaleImage(original) : original
   try {
     const body = new FormData()
     body.append('file', f)
@@ -335,7 +373,7 @@ export function BackgroundLibraryPanel({ lib, onAddToPlaylist }: LibraryProps) {
           disabled={uploading}
           className="text-[9px] px-2 py-0.5 rounded"
           style={{ background: '#1d4ed8', color: '#fff', opacity: uploading ? 0.6 : 1 }}
-        >{uploading ? 'Upload…' : '+ Upload'}</button>
+        >{uploading ? 'Memproses…' : '+ Upload'}</button>
         <input
           ref={fileRef} type="file" multiple accept="image/*,video/*" className="hidden"
           onChange={async e => {

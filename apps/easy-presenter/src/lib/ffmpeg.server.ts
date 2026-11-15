@@ -130,9 +130,14 @@ function encoderArgs(enc: string, maxKbps: number): string[] {
   }
 }
 
+export interface ConvertOptions {
+  /** Drop the audio track (looping backgrounds are always muted) */
+  noAudio?: boolean
+}
+
 function transcode(
   ff: FfmpegInfo, input: string, output: string, info: VideoInfo, limits: VideoLimits, enc: string,
-  onProgress: (p: number) => void,
+  onProgress: (p: number) => void, opts: ConvertOptions = {},
 ): Promise<void> {
   const height  = Math.min(info.height || limits.maxHeight, limits.maxHeight)
   const filters = [`scale=-2:${height % 2 === 0 ? height : height - 1}`]
@@ -140,10 +145,10 @@ function transcode(
   const args = [
     '-y', '-hide_banner', '-nostats', '-progress', 'pipe:1',
     '-i', input,
-    '-map', '0:v:0', '-map', '0:a:0?',
+    '-map', '0:v:0', ...(opts.noAudio ? [] : ['-map', '0:a:0?']),
     '-vf', filters.join(','),
     ...encoderArgs(enc, Math.min(limits.maxBitrateKbps, height <= 720 ? 5000 : height <= 1080 ? 10000 : limits.maxBitrateKbps)),
-    '-c:a', 'aac', '-b:a', '160k', '-ac', '2',
+    ...(opts.noAudio ? ['-an'] : ['-c:a', 'aac', '-b:a', '160k', '-ac', '2']),
     '-movflags', '+faststart',
     '-f', 'mp4', output,
   ]
@@ -167,6 +172,7 @@ function transcode(
  */
 export function enqueueConversion(
   ff: FfmpegInfo, dir: string, file: string, target: string, info: VideoInfo, limits: VideoLimits, reasons: string[],
+  opts: ConvertOptions = {},
 ): ConvertJob {
   const job: ConvertJob = { file, target, state: 'queued', progress: 0, reasons }
   jobs.set(file, job)
@@ -179,13 +185,13 @@ export function enqueueConversion(
       let enc = await pickEncoder(ff)
       job.encoder = enc
       try {
-        await transcode(ff, input, part, info, limits, enc, p => { job.progress = p })
+        await transcode(ff, input, part, info, limits, enc, p => { job.progress = p }, opts)
       } catch (err) {
         if (enc === 'libx264') throw err
         enc = 'libx264'                       // hardware encoder failed on this file → CPU
         job.encoder = enc
         job.progress = 0
-        await transcode(ff, input, part, info, limits, enc, p => { job.progress = p })
+        await transcode(ff, input, part, info, limits, enc, p => { job.progress = p }, opts)
       }
       renameSync(part, join(dir, target))
       if (!limits.keepOriginal && existsSync(input)) unlinkSync(input)
@@ -198,6 +204,11 @@ export function enqueueConversion(
     }
   })
   return job
+}
+
+/** Resolves once every queued conversion (including the one just queued) has finished */
+export function conversionsSettled(): Promise<void> {
+  return g.__ecQueue ?? Promise.resolve()
 }
 
 export function listJobs(): ConvertJob[] {

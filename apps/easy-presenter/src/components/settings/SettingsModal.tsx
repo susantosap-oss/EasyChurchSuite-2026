@@ -578,6 +578,10 @@ function PerformanceTab({ draft, setDraft, saved }: {
         <p className="text-[10px]" style={{ color: C.dim }}>
           Format yang selalu dikonversi: AVI, MKV, WMV, MPG, FLV, 3GP, TS. Codec ringan yang diputar langsung: H.264, VP8, VP9.
         </p>
+        <p className="text-[10px]" style={{ color: C.dim }}>
+          Background (diputar berulang terus): video maks. 1080p · 30 fps · 8 Mbps tanpa audio; gambar diperkecil ke maks. 1920×1080.
+          Batas di atas berlaku juga bila lebih ketat. File asli background tidak disimpan.
+        </p>
       </Section>
 
       <Section title="GPU" note="Akselerasi GPU membuat video & animasi background lebih halus. Matikan hanya bila output berkedip / hitam di PC lama.">

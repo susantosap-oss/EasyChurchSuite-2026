@@ -119,7 +119,7 @@ export function SaveSceneModal({ items, currentScene, onClose, onLoad, onSaved }
     >
       <div
         className="flex flex-col rounded-2xl overflow-hidden"
-        style={{ width: 480, maxHeight: '85vh', background: '#161b27', border: '1px solid #2a3347' }}
+        style={{ width: 480, maxHeight: '85%', background: '#161b27', border: '1px solid #2a3347' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0"

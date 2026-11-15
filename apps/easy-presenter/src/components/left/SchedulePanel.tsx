@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { ServiceItem } from '../types'
+import { ContextMenu, menuPosFrom, type MenuPos, type MenuItem } from '../shared/ContextMenu'
 
 const TYPE_CONFIG = {
   song:         { icon: '♪', color: '#3b82f6', label: 'Lagu' },
@@ -16,9 +17,16 @@ interface Props {
   liveItemId: string | null
   onSelect: (id: string) => void
   onDelete: (id: string) => void
+  onEditSong: (id: string) => void
 }
 
-export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onDelete }: Props) {
+export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onDelete, onEditSong }: Props) {
+  const [menu, setMenu] = useState<{ item: ServiceItem; pos: MenuPos } | null>(null)
+  const menuItems = (item: ServiceItem): MenuItem[] => [
+    ...(item.type === 'song' ? [{ label: '📝  Edit Lagu', onSelect: () => onEditSong(item.id) }] : []),
+    { label: '✕  Hapus dari Urutan', onSelect: () => handleDelete(item.id), danger: true },
+  ]
+
   // Deleting the item that is on air takes it off air — ask with a second click first
   const [confirmId, setConfirmId] = useState<string | null>(null)
   useEffect(() => {
@@ -60,6 +68,7 @@ export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onD
               className="flex items-center gap-2.5 cursor-pointer"
               style={{ padding: '7px 10px' }}
               onClick={() => onSelect(item.id)}
+              onContextMenu={e => setMenu({ item, pos: menuPosFrom(e) })}
             >
               {/* Order number */}
               <span
@@ -116,6 +125,9 @@ export function SchedulePanel({ service, activeItemId, liveItemId, onSelect, onD
           </div>
         )
       })}
+      {menu && (
+        <ContextMenu pos={menu.pos} title={menu.item.title} items={menuItems(menu.item)} onClose={() => setMenu(null)} />
+      )}
     </div>
   )
 }

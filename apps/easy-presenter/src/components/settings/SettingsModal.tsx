@@ -130,7 +130,7 @@ export function SettingsModal({ settings, bgLibrary, currentScene, onSave, onCre
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="flex flex-col rounded-2xl overflow-hidden"
-        style={{ width: 'min(980px, 94vw)', height: '86vh', background: C.panel, border: `1px solid ${C.border}` }}>
+        style={{ width: 'min(980px, 94%)', height: '86%', background: C.panel, border: `1px solid ${C.border}` }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
           style={{ borderBottom: `1px solid ${C.border}`, background: '#1a2235' }}>

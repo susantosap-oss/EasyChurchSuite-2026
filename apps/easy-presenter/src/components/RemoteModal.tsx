@@ -52,7 +52,7 @@ export function RemoteModal({ clients, onClose }: { clients: RemoteInfo['clients
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
-      <div className="rounded-xl w-[640px] max-w-[95vw] max-h-[92vh] overflow-y-auto"
+      <div className="rounded-xl w-[640px] max-w-[95%] max-h-[92%] overflow-y-auto"
         style={{ background: '#0f1117', border: '1px solid #2a3347' }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center px-4 h-11" style={{ borderBottom: '1px solid #2a3347', background: '#161b27' }}>
           <span className="text-sm font-semibold">📱 Remote HP</span>

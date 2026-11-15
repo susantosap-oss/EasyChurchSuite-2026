@@ -4,13 +4,30 @@ import { useMemo, useRef, useState } from 'react'
 import type { ServiceItem } from '../types'
 import { DEFAULT_SONG_BG, DEFAULT_TEXT_STYLE } from '../types'
 import { SlideCanvas } from '../shared/SlideCanvas'
-import { parseLyrics } from '@/lib/lyrics'
+import { parseLyrics, slidesToLyrics } from '@/lib/lyrics'
 import { replaceWord } from '@/lib/spell/text'
 import { useSpellCheck, WordFixChip, addToDictionary } from './SpellCheck'
 
+/**
+ * window event fired after a library song is saved in the editor (detail: EditableSong) —
+ * the Library list and every copy in the Urutan Ibadah follow it
+ */
+export const SONG_EDITED = 'ec:song-edited'
+
+/** A song opened for editing; no id = a service-only song (not in the library), nothing is stored */
+export interface EditableSong {
+  id?: number
+  title: string
+  artist: string
+  slides: Array<{ label: string; lyrics: string }>
+}
+
 interface Props {
   onClose: () => void
-  onAdded: (item: ServiceItem) => void
+  onAdded?: (item: ServiceItem) => void
+  /** Edit mode: prefilled with this song; saving replaces it in the library */
+  song?: EditableSong
+  onSaved?: (song: EditableSong) => void
 }
 
 // ProPresenter-style group colors
@@ -37,10 +54,11 @@ const LINES_OPTIONS: Array<{ value: number; label: string }> = [
 
 const QUICK_LABELS = ['Verse', 'Pre-Chorus', 'Chorus', 'Bridge', 'Tag', 'Intro', 'Outro']
 
-export function AddSongModal({ onClose, onAdded }: Props) {
-  const [title, setTitle]       = useState('')
-  const [artist, setArtist]     = useState('')
-  const [lyrics, setLyrics]     = useState('')
+export function AddSongModal({ onClose, onAdded, song, onSaved }: Props) {
+  const editing = !!song
+  const [title, setTitle]       = useState(song?.title ?? '')
+  const [artist, setArtist]     = useState(song?.artist ?? '')
+  const [lyrics, setLyrics]     = useState(() => (song ? slidesToLyrics(song.slides) : ''))
   const [maxLines, setMaxLines] = useState(0)
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
@@ -127,6 +145,28 @@ export function AddSongModal({ onClose, onAdded }: Props) {
     }
 
     setSaving(true)
+    if (song) {
+      const edited: EditableSong = { id: song.id, title: saveTitle.trim(), artist: artist.trim(), slides: saveSlides }
+      try {
+        if (song.id != null) {
+          const res = await fetch(`/api/songs/${song.id}/`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: edited.title, artist: edited.artist, slides: edited.slides }),
+          })
+          const data = await res.json() as { error?: string }
+          if (!res.ok || data.error) throw new Error(data.error ?? 'Gagal menyimpan')
+          window.dispatchEvent(new CustomEvent<EditableSong>(SONG_EDITED, { detail: edited }))
+        }
+        onSaved?.(edited)
+        onClose()
+      } catch (err) {
+        setError(`Gagal simpan ke database: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`)
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
     try {
       const res = await fetch('/api/songs/', {
         method: 'POST',
@@ -136,7 +176,7 @@ export function AddSongModal({ onClose, onAdded }: Props) {
       const data = await res.json() as { id?: number; error?: string }
       if (!res.ok || data.error) throw new Error(data.error ?? 'Gagal menyimpan')
 
-      onAdded(buildItem(`song_${data.id}`, data.id, saveTitle, saveSlides))
+      onAdded?.(buildItem(`song_${data.id}`, data.id, saveTitle, saveSlides))
       onClose()
     } catch (err) {
       setError(`Gagal simpan ke database: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`)
@@ -149,7 +189,7 @@ export function AddSongModal({ onClose, onAdded }: Props) {
   // Fallback when the database is unavailable: add to the service only
   const handleAddWithoutSave = () => {
     if (!validate()) return
-    onAdded(buildItem(`song_local_${Date.now()}`))
+    onAdded?.(buildItem(`song_local_${Date.now()}`))
     onClose()
   }
 
@@ -161,13 +201,13 @@ export function AddSongModal({ onClose, onAdded }: Props) {
     >
       <div
         className="flex flex-col rounded-2xl overflow-hidden"
-        style={{ width: 'min(1180px, 94vw)', height: '88vh', background: '#161b27', border: '1px solid #2a3347' }}
+        style={{ width: 'min(1180px, 94%)', height: '88%', background: '#161b27', border: '1px solid #2a3347' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0"
           style={{ borderBottom: '1px solid #2a3347', background: '#1a2235' }}>
           <div>
-            <h2 className="text-sm font-bold" style={{ color: '#f1f5f9' }}>+ Tambah Lagu</h2>
+            <h2 className="text-sm font-bold" style={{ color: '#f1f5f9' }}>{editing ? '📝 Edit Lagu' : '+ Tambah Lagu'}</h2>
             <p className="text-[10px] mt-0.5" style={{ color: '#94a3b8' }}>
               Tempel lirik — baris kosong = slide baru · label [Verse 1] / [Chorus] = grup baru
             </p>
@@ -378,7 +418,7 @@ export function AddSongModal({ onClose, onAdded }: Props) {
               opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? 'Menyimpan...' : `✓ Simpan Lagu (${slides.length} slide)`}
+            {saving ? 'Menyimpan...' : `✓ ${editing ? 'Simpan Perubahan' : 'Simpan Lagu'} (${slides.length} slide)`}
           </button>
         </div>
       </div>

@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ContextMenu, menuPosFrom, type MenuPos } from '../shared/ContextMenu'
 import type { ServiceItem, SongSettings } from '../types'
 import { applySongSettings, SONG_SETTINGS_SAVED, type SongSettingsSavedDetail } from '../shared/songSettings'
 import { DEFAULT_SONG_BG, DEFAULT_TEXT_STYLE } from '../types'
-import { AddSongModal } from './AddSongModal'
+import { AddSongModal, SONG_EDITED, type EditableSong } from './AddSongModal'
 import { ImportSongsModal } from './ImportSongsModal'
 import { SpellReviewModal } from './SpellReviewModal'
 
@@ -27,10 +28,12 @@ export function SongLibrary({ onAdd }: Props) {
   const [loading, setLoading]   = useState(true)
   const [showAdd, setShowAdd]       = useState(false)
   const [showImport, setShowImport] = useState(false)
+  const [editing, setEditing]       = useState<DbSong | null>(null)
   /** Typo review: all songs (null ids) or just the imported ones */
   const [spellReview, setSpellReview] = useState<{ ids?: number[] } | null>(null)
   const [confirmId, setConfirmId]   = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [menu, setMenu] = useState<{ song: DbSong; pos: MenuPos } | null>(null)
 
   const fetchSongs = async () => {
     try {
@@ -89,6 +92,21 @@ export function SongLibrary({ onAdd }: Props) {
     } catch { /* ignore */ }
     finally { setDeletingId(null) }
   }
+
+  // A song saved in the editor — from here, the Urutan Ibadah or the slide grid
+  useEffect(() => {
+    const onEdited = (e: Event) => {
+      const edited = (e as CustomEvent<EditableSong>).detail
+      setSongs(prev => prev.map(s => s.id !== edited.id ? s : {
+        ...s,
+        title: edited.title,
+        artist: edited.artist,
+        slides: edited.slides.map((sl, i) => ({ id: i, slide_order: i + 1, label: sl.label, lyrics: sl.lyrics })),
+      }).sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })))
+    }
+    window.addEventListener(SONG_EDITED, onEdited)
+    return () => window.removeEventListener(SONG_EDITED, onEdited)
+  }, [])
 
   const handleAdded = (item: ServiceItem) => {
     const dbId = parseInt(item.id.split('_')[1] ?? '')
@@ -184,7 +202,8 @@ export function SongLibrary({ onAdd }: Props) {
               {confirmId !== song.id ? (
                 <div
                   className="flex items-center px-2.5 py-1.5 rounded-lg group"
-                  style={{ background: 'transparent' }}
+                  style={{ background: menu?.song.id === song.id ? '#1e2535' : 'transparent' }}
+                  onContextMenu={e => setMenu({ song, pos: menuPosFrom(e) })}
                   onMouseEnter={e => (e.currentTarget.style.background = '#1e2535')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
@@ -201,6 +220,14 @@ export function SongLibrary({ onAdd }: Props) {
                       style={{ background: '#1d4ed8', color: 'white' }}
                     >
                       + Ibadah
+                    </button>
+                    <button
+                      onClick={() => setEditing(song)}
+                      className="text-[9px] px-1.5 py-0.5 rounded"
+                      style={{ background: '#1e2535', color: '#cbd5e1', border: '1px solid #2a3347' }}
+                      title="Edit lirik & susunan slide"
+                    >
+                      ✎
                     </button>
                     <button
                       onClick={() => setConfirmId(song.id)}
@@ -247,6 +274,25 @@ export function SongLibrary({ onAdd }: Props) {
         <AddSongModal
           onClose={() => setShowAdd(false)}
           onAdded={handleAdded}
+        />
+      )}
+
+      {menu && (
+        <ContextMenu
+          pos={menu.pos}
+          title={menu.song.title}
+          onClose={() => setMenu(null)}
+          items={[
+            { label: '📝  Edit Lagu', onSelect: () => setEditing(menu.song) },
+            { label: '🗑  Hapus Lagu', onSelect: () => setConfirmId(menu.song.id), danger: true },
+          ]}
+        />
+      )}
+
+      {editing && (
+        <AddSongModal
+          song={editing}
+          onClose={() => setEditing(null)}
         />
       )}
 

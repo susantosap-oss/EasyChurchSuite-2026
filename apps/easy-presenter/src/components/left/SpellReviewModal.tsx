@@ -85,7 +85,7 @@ export function SpellReviewModal({ ids, onClose, onChanged }: Props) {
       style={{ background: 'rgba(0,0,0,0.75)' }}
       onClick={e => { if (e.target === e.currentTarget && busy == null) close() }}>
       <div className="flex flex-col rounded-2xl overflow-hidden"
-        style={{ width: 'min(860px, 94vw)', height: '84vh', background: '#161b27', border: '1px solid #2a3347' }}>
+        style={{ width: 'min(860px, 94%)', height: '84%', background: '#161b27', border: '1px solid #2a3347' }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0"
           style={{ borderBottom: '1px solid #2a3347', background: '#1a2235' }}>

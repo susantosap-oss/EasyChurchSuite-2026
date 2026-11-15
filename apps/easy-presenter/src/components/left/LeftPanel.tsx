@@ -18,6 +18,8 @@ interface Props {
   liveItemId: string | null
   onSelectItem: (id: string) => void
   onDeleteItem: (id: string) => void
+  /** Edit a song item's lyrics (also saved to the library when it came from there) */
+  onEditSong: (id: string) => void
   onAddScripture: (payload: ScriptureAddPayload) => void
   onAddSong: (item: ServiceItem, hasSavedSettings?: boolean) => void
   onAddMedia: (file: MediaFile) => void
@@ -29,7 +31,7 @@ interface Props {
 
 export function LeftPanel({
   service, activeItemId, liveItemId,
-  onSelectItem, onDeleteItem, onAddScripture, onAddSong, onAddMedia,
+  onSelectItem, onDeleteItem, onEditSong, onAddScripture, onAddSong, onAddMedia,
   onQuickLaunch, onLoadScene, currentScene, onSceneSaved,
 }: Props) {
   const [libTab, setLibTab]       = useState<LibTab>('songs')
@@ -74,6 +76,7 @@ export function LeftPanel({
             liveItemId={liveItemId}
             onSelect={onSelectItem}
             onDelete={onDeleteItem}
+            onEditSong={onEditSong}
           />
         </div>
 

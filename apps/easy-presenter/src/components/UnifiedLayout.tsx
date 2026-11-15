@@ -18,7 +18,8 @@ import { applyAppDefaults, defaultTextStyle, chromaColor, chromaApplies } from '
 import { SettingsModal } from './settings/SettingsModal'
 import { openOutputChannel, type OutputMessage, type OutputState, type RunningText } from '@/lib/outputBus'
 import type { ServiceItem, SlideBackground, TextStyle, Slide } from './types'
-import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextStyle, pickedBackground, withUniqueSlideIds } from './types'
+import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextStyle, pickedBackground, withUniqueSlideIds, songIdOf } from './types'
+import { AddSongModal, SONG_EDITED, type EditableSong } from './left/AddSongModal'
 import type { SceneRef } from './left/SaveSceneModal'
 import type { TextAnimation, MediaControl, MediaStatus } from './types'
 import { DEFAULT_MEDIA_CONTROL } from './types'
@@ -322,6 +323,53 @@ ${name}` }],
       slides: item.slides.map(s => s.id === slideId ? { ...s, ...updates } : s),
     })))
 
+  // ── Song text edits (Edit Lagu from the Library, the Urutan Ibadah or the slide grid) ──
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  const [songEditItemId, setSongEditItemId] = useState<string | null>(null)
+
+  /**
+   * New lyrics for every copy of the song in the service (or only `onlyItemId` for a song that is not
+   * in the library). Slides keep their id and per-slide settings by position, so the slide on air stays
+   * on air with its new text; when the song got shorter, selection / live move to its last slide.
+   */
+  const applySongEdit = (edited: EditableSong, onlyItemId?: string) => {
+    const matches = (i: ServiceItem) =>
+      onlyItemId ? i.id === onlyItemId : edited.id != null && songIdOf(i) === edited.id
+    const stamp = Date.now().toString(36)
+    const prev  = itemsRef.current
+    const next  = prev.map(item => {
+      if (!matches(item)) return item
+      const slides = edited.slides.map((s, idx) => {
+        const old = item.slides[idx]
+        return old
+          ? { ...old, label: s.label, text: s.lyrics }
+          : { id: `${item.id}_e${stamp}_${idx + 1}`, label: s.label, text: s.lyrics }
+      })
+      return { ...item, title: edited.title, subtitle: edited.artist, slides }
+    })
+    if (!next.some((item, i) => item !== prev[i])) return
+    const exists   = (id: string | null) => !!id && next.some(i => i.slides.some(s => s.id === id))
+    const fallback = (id: string | null) => {
+      const before = prev.find(i => i.slides.some(s => s.id === id))
+      return next.find(i => i.id === before?.id)?.slides.at(-1)?.id ?? null
+    }
+    itemsRef.current = next
+    setItems(next)
+    setActiveSlideId(cur => (exists(cur) ? cur : fallback(cur) ?? cur))
+    setLiveSlideId(cur => (cur == null || exists(cur) ? cur : fallback(cur)))
+  }
+
+  const applySongEditRef = useRef(applySongEdit)
+  applySongEditRef.current = applySongEdit
+  useEffect(() => {
+    const onEdited = (e: Event) => applySongEditRef.current((e as CustomEvent<EditableSong>).detail)
+    window.addEventListener(SONG_EDITED, onEdited)
+    return () => window.removeEventListener(SONG_EDITED, onEdited)
+  }, [])
+
+  const songEditItem = songEditItemId ? items.find(i => i.id === songEditItemId) ?? null : null
+
   const handleAddScripture = ({ title, subtitle, slides }: ScriptureAddPayload) => {
     const newId = `sc_${Date.now()}`
     const newItem: ServiceItem = {
@@ -612,6 +660,7 @@ ${name}` }],
             if (item) setActiveSlideId(item.slides[0]!.id)
           }}
           onDeleteItem={handleDeleteItem}
+          onEditSong={setSongEditItemId}
           onAddScripture={handleAddScripture}
           onAddSong={handleAddSong}
           onAddMedia={handleAddMedia}
@@ -640,6 +689,7 @@ ${name}` }],
           onClearLive={handleClearText}
           isClearLive={isClearText}
           onEditSlide={setEditSlideId}
+          onEditSong={() => setSongEditItemId(activeItem.id)}
           onUpdateSlide={updateSlide}
           bgLibrary={bgLibrary}
           onUpdateItem={updateItem}
@@ -714,6 +764,20 @@ ${name}` }],
           item={editingItem}
           onSave={updateSlide}
           onClose={() => setEditSlideId(null)}
+        />
+      )}
+
+      {songEditItem && (
+        <AddSongModal
+          song={{
+            id: songIdOf(songEditItem),
+            title: songEditItem.title,
+            artist: songEditItem.subtitle,
+            slides: songEditItem.slides.map(s => ({ label: s.label, lyrics: s.text })),
+          }}
+          // Library songs reach every copy through SONG_EDITED; a service-only song changes just this item
+          onSaved={edited => { if (edited.id == null) applySongEdit(edited, songEditItem.id) }}
+          onClose={() => setSongEditItemId(null)}
         />
       )}
     </div>

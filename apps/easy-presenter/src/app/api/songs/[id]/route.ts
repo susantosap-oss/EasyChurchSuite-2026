@@ -3,14 +3,22 @@ import { getPresenterDb } from '@/lib/db.server'
 import { invalidateSpellDict } from '@/lib/spell/spell.server'
 import { replaceWord } from '@/lib/spell/text'
 
-/** Save presenter defaults for a song: { settings: SongSettings } */
+type SongEdit = { title?: string; artist?: string; slides?: Array<{ label: string; lyrics: string }> }
+
+/**
+ * { settings: SongSettings } → save presenter defaults for a song;
+ * { title, artist, slides }  → replace the song's title, artist and all its slides (Edit Lagu)
+ */
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const db = getPresenterDb() as unknown as import('better-sqlite3').Database
     const id = parseInt(params.id, 10)
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
-    const { settings } = await req.json() as { settings: unknown }
+    const body = await req.json() as { settings?: unknown } & SongEdit
+    if (Array.isArray(body.slides)) return editSong(db, id, body)
+
+    const { settings } = body
     const result = db.prepare(
       `UPDATE songs SET settings = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`
     ).run(settings == null ? null : JSON.stringify(settings), id)
@@ -21,6 +29,28 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: msg }, { status: 503 })
   }
+}
+
+function editSong(db: import('better-sqlite3').Database, id: number, body: SongEdit) {
+  const title  = body.title?.trim() ?? ''
+  const slides = (body.slides ?? []).filter(s => s.lyrics?.trim())
+  if (!title)         return NextResponse.json({ error: 'Judul lagu wajib diisi' }, { status: 400 })
+  if (!slides.length) return NextResponse.json({ error: 'Lirik wajib diisi' }, { status: 400 })
+  if (!db.prepare('SELECT id FROM songs WHERE id = ?').get(id)) {
+    return NextResponse.json({ error: 'Song not found' }, { status: 404 })
+  }
+
+  const insertSlide = db.prepare('INSERT INTO song_slides(song_id, slide_order, label, lyrics) VALUES (?, ?, ?, ?)')
+  db.transaction(() => {
+    db.prepare(`UPDATE songs SET title = ?, artist = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?`)
+      .run(title, (body.artist ?? '').trim(), id)
+    db.prepare('DELETE FROM song_slides WHERE song_id = ?').run(id)
+    slides.forEach((s, i) => insertSlide.run(id, i + 1, s.label || `Slide ${i + 1}`, s.lyrics.trim()))
+  })()
+  invalidateSpellDict()
+
+  const updated = db.prepare('SELECT id, slide_order, label, lyrics FROM song_slides WHERE song_id = ? ORDER BY slide_order').all(id)
+  return NextResponse.json({ success: true, slides: updated })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {

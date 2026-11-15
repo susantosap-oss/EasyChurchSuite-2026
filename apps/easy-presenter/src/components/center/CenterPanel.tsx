@@ -24,6 +24,7 @@ interface Props {
   onClearLive: () => void               // Ctrl+C — clear text, keep background
   isClearLive: boolean                  // current clear-text state
   onEditSlide: (slideId: string) => void
+  onEditSong: () => void                 // whole song text (Edit Lagu)
   onUpdateSlide: (slideId: string, updates: Partial<ServiceItem['slides'][0]>) => void
   bgLibrary: BgLibrary
   onUpdateItem: (patch: Partial<ServiceItem>) => void   // applies to this item
@@ -43,7 +44,7 @@ const TYPE_BADGE: Record<string, { label: string; color: string }> = {
 
 export function CenterPanel({
   item, activeSlideId, liveSlideId, isLive,
-  onSelectSlide, onGoLiveSlide, onClearLive, isClearLive, onEditSlide, onUpdateSlide, bgLibrary, onUpdateItem, onUpdateTextStyle, onUpdateGroupAnimation,
+  onSelectSlide, onGoLiveSlide, onClearLive, isClearLive, onEditSlide, onEditSong, onUpdateSlide, bgLibrary, onUpdateItem, onUpdateTextStyle, onUpdateGroupAnimation,
   mediaControl, mediaStatus, onMediaControl,
 }: Props) {
   const badge        = TYPE_BADGE[item.type] ?? TYPE_BADGE.announcement!
@@ -474,6 +475,8 @@ export function CenterPanel({
               onSelect={onSelectSlide}
               onGoLive={onGoLiveSlide}
               isItemLive={isSongLive}
+              onEditSlide={isMedia ? undefined : onEditSlide}
+              onEditAll={isSong ? onEditSong : undefined}
               groupAnimations={item.groupAnimations}
               onUpdateSlide={isSong && bgTab === 'tempo' ? onUpdateSlide : undefined}
             />

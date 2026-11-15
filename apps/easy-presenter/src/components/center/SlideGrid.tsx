@@ -6,6 +6,7 @@ import { SlideCanvas } from '../shared/SlideCanvas'
 import type { Slide, SlideBackground, TextStyle, TextAnimation } from '../types'
 import { animGroupKey } from '../types'
 import { groupColor } from '../left/AddSongModal'
+import { ContextMenu, menuPosFrom, type MenuPos, type MenuItem } from '../shared/ContextMenu'
 
 const JEDA_OPTIONS = [1, 2, 4, 8]
 /** Smallest card width — readable text on low-res screens; wider screens get more / bigger cards */
@@ -23,13 +24,21 @@ interface Props {
   onUpdateSlide?: (id: string, updates: Partial<Slide>) => void
   isItemLive?: boolean   // this item is on output → single click sends slide live
   groupAnimations?: Record<string, TextAnimation>
+  /** Right-click menu: edit this slide (same as the Edit button) / the whole song's text */
+  onEditSlide?: (id: string) => void
+  onEditAll?: () => void
 }
 
 export function SlideGrid({
   slides, activeSlideId, liveSlideId, background, textStyle,
-  onSelect, onGoLive, onUpdateSlide, isItemLive = false, groupAnimations,
+  onSelect, onGoLive, onUpdateSlide, isItemLive = false, groupAnimations, onEditSlide, onEditAll,
 }: Props) {
   const [jedaEditId, setJedaEditId] = useState<string | null>(null)
+  const [menu, setMenu] = useState<{ slide: Slide; pos: MenuPos } | null>(null)
+  const menuItems: MenuItem[] = menu ? [
+    ...(onEditAll   ? [{ label: '📝  Edit Semua Slide', onSelect: onEditAll }] : []),
+    ...(onEditSlide ? [{ label: '✎  Edit Slide Ini', onSelect: () => onEditSlide(menu.slide.id) }] : []),
+  ] : []
   // Real card width, so thumbnail text scales with the card instead of a fixed 110px guess
   const gridRef = useRef<HTMLDivElement>(null)
   const gridW   = useElementWidth(gridRef)
@@ -70,6 +79,10 @@ export function SlideGrid({
               <button
                 onClick={() => (isItemLive ? onGoLive(slide.id) : onSelect(slide.id))}
                 onDoubleClick={() => onGoLive(slide.id)}
+                onContextMenu={e => {
+                  if (!onEditAll && !onEditSlide) return
+                  setMenu({ slide, pos: menuPosFrom(e) })
+                }}
                 className="text-left rounded-xl overflow-hidden transition-all"
                 style={{
                   borderRadius: (hasJeda || isEditingJeda) ? '12px 12px 0 0' : '12px',
@@ -189,6 +202,9 @@ export function SlideGrid({
           )
         })}
       </div>
+      {menu && menuItems.length > 0 && (
+        <ContextMenu pos={menu.pos} title={menu.slide.label} items={menuItems} onClose={() => setMenu(null)} />
+      )}
     </div>
   )
 }

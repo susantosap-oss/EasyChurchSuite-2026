@@ -36,3 +36,18 @@ export function parseLyrics(text: string, maxLines = 0): ParsedSlide[] {
   }
   return slides
 }
+
+/**
+ * Inverse of parseLyrics, for editing a stored song: "[Label]" wherever the group changes,
+ * a blank line between slides. Auto labels ("Slide 3") are left out — parseLyrics makes them again.
+ */
+export function slidesToLyrics(slides: Array<{ label: string; lyrics: string }>): string {
+  let prev = ''
+  return slides.map(s => {
+    const label = (s.label ?? '').trim()
+    const named = label && !/^slide\s*\d+$/i.test(label)
+    const head  = named && label !== prev ? `[${label}]\n` : ''
+    prev = named ? label : ''
+    return head + s.lyrics.trim()
+  }).join('\n\n')
+}

@@ -82,7 +82,7 @@ export function SlideEditModal({ slide, item, onSave, onClose }: Props) {
       <div
         className="flex flex-col rounded-2xl overflow-hidden"
         style={{
-          width: 560, maxHeight: 'calc(100vh - 80px)',
+          width: 560, maxHeight: 'calc(100% - 80px)',
           background: '#161b27', border: '1px solid #2a3347',
           boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
         }}

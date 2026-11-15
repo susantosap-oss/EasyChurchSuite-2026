@@ -114,7 +114,7 @@ export function FontPickerModal({ currentFont, onSelect, onClose }: Props) {
     >
       <div
         className="flex flex-col rounded-2xl overflow-hidden"
-        style={{ width: 500, height: '80vh', background: '#161b27', border: '1px solid #2a3347' }}
+        style={{ width: 500, height: '80%', background: '#161b27', border: '1px solid #2a3347' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 flex-shrink-0"

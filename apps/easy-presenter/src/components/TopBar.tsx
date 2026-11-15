@@ -115,11 +115,8 @@ export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLau
     >
       {/* Logo */}
       <div className="flex items-center gap-2 mr-2 flex-shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
-          <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-          </svg>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icon.png" alt="" width={28} height={28} className="w-7 h-7 flex-shrink-0" draggable={false} />
         <span className="text-sm font-bold text-white tracking-tight">EasyChurch</span>
         <span className="text-xs text-slate-500 font-medium">Suite</span>
       </div>

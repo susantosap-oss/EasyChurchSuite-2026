@@ -1,6 +1,6 @@
 import { app, BrowserWindow, screen, ipcMain, dialog, type Display } from 'electron'
 import { join, dirname } from 'path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, createWriteStream } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, createWriteStream, readdirSync } from 'fs'
 import { execFile, spawn, type ChildProcess } from 'child_process'
 import http from 'http'
 import net from 'net'
@@ -99,6 +99,30 @@ function waitForHttp(url: string, timeoutMs: number): Promise<void> {
   })
 }
 
+/**
+ * Copy the backgrounds shipped with the installer (ECsuite001.mp4 …, ECsuite01.jpg …) into the
+ * background library. Each file is copied once: a file the church deleted from the library is
+ * not brought back, while backgrounds added in a newer installer still arrive.
+ */
+function installBundledBackgrounds(srcDir: string, destDir: string) {
+  try {
+    if (!existsSync(srcDir)) return
+    mkdirSync(destDir, { recursive: true })
+    const markerPath = join(destDir, '.bundled.json')
+    const done: string[] = existsSync(markerPath) ? JSON.parse(readFileSync(markerPath, 'utf8')) : []
+    const copied = new Set(done)
+    for (const name of readdirSync(srcDir)) {
+      if (name === 'manifest.json' || copied.has(name)) continue
+      const dest = join(destDir, name)
+      if (!existsSync(dest)) copyFileSync(join(srcDir, name), dest)
+      copied.add(name)
+    }
+    writeFileSync(markerPath, JSON.stringify([...copied].sort(), null, 2))
+  } catch (err) {
+    console.error('[backgrounds] bundled copy failed:', err)
+  }
+}
+
 /** Start the bundled Next.js server with Electron's Node; data lives in %APPDATA%/EasyChurch Suite/data */
 async function startBundledServer(): Promise<string> {
   const resources = process.resourcesPath
@@ -108,6 +132,7 @@ async function startBundledServer(): Promise<string> {
   mkdirSync(dataDir, { recursive: true })
   // First run: copy the starter database (TB + KJV) out of the read-only install folder
   if (!existsSync(dbPath)) copyFileSync(join(resources, 'seed', 'easy_bible.db'), dbPath)
+  installBundledBackgrounds(join(resources, 'backgrounds'), join(dataDir, 'backgrounds'))
 
   const port = await findFreePort(3901)
   const log  = createWriteStream(join(app.getPath('userData'), 'server.log'), { flags: 'w' })
@@ -133,9 +158,17 @@ async function startBundledServer(): Promise<string> {
   return url
 }
 
-const SPLASH = 'data:text/html;charset=utf-8,' + encodeURIComponent(
-  '<body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;' +
-  'background:#0f172a;color:#94a3b8;font-family:Segoe UI,sans-serif">Memulai EasyChurch Suite…</body>')
+// Startup splash with the app logo (build/logo-app.png in dev, assets/logo-app.png when installed)
+function splashUrl(): string {
+  let logo = ''
+  try {
+    const p = join(__dirname, app.isPackaged ? '../assets/logo-app.png' : '../build/logo-app.png')
+    if (existsSync(p)) logo = `<img src="data:image/png;base64,${readFileSync(p).toString('base64')}" width="220" height="220" style="margin-bottom:18px">`
+  } catch { /* text only */ }
+  return 'data:text/html;charset=utf-8,' + encodeURIComponent(
+    '<body style="margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    `background:#0f172a;color:#94a3b8;font-family:Segoe UI,sans-serif">${logo}<div>Memulai EasyChurch Suite…</div></body>`)
+}
 
 const webPreferences = () => ({
   nodeIntegration: false,
@@ -161,7 +194,7 @@ function createOperatorWindow() {
   })
 
   operatorWindow.once('ready-to-show', () => operatorWindow!.maximize())
-  operatorWindow.loadURL(isDev ? DEV_URL : SPLASH)
+  operatorWindow.loadURL(isDev ? DEV_URL : splashUrl())
 
   operatorWindow.on('closed', () => {
     operatorWindow = null

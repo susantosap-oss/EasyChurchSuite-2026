@@ -6,6 +6,7 @@
 //   vendor/ffmpeg/ffmpeg.exe              FFmpeg essentials build (gyan.dev)
 //   vendor/seed/easy_bible.db             node scripts/make-seed.cjs
 //   vendor/better-sqlite3/better_sqlite3.node   prebuild for Electron's ABI
+//   vendor/backgrounds/                    node scripts/make-backgrounds.cjs D:/Background (optional)
 //                                         (better-sqlite3-v<ver>-electron-v<abi>-win32-x64.tar.gz)
 //
 // The app is assembled in release/stage with a dependency-free package.json, so electron-builder
@@ -99,10 +100,17 @@ for (const f of nativeModules) fs.copyFileSync(path.join(vendor, 'better-sqlite3
 console.log(`  better_sqlite3.node replaced: ${nativeModules.length}`)
 fs.cpSync(path.join(vendor, 'ffmpeg'), path.join(stage, 'ffmpeg'), { recursive: true })
 fs.cpSync(path.join(vendor, 'seed'), path.join(stage, 'seed'), { recursive: true })
+// Bundled background library (copied into the user's library on first start)
+const bundledBg = path.join(vendor, 'backgrounds')
+fs.mkdirSync(path.join(stage, 'backgrounds'), { recursive: true })
+if (fs.existsSync(bundledBg)) fs.cpSync(bundledBg, path.join(stage, 'backgrounds'), { recursive: true })
+else console.log('  (no vendor/backgrounds — installer ships without bundled backgrounds)')
 fs.cpSync(path.join(root, 'dist-electron'), path.join(stage, 'dist-electron'), { recursive: true })
 // Icon for the phone remote page (home-screen icon), read by the main process
 fs.mkdirSync(path.join(stage, 'assets'), { recursive: true })
 fs.copyFileSync(path.join(root, 'build/icon.png'), path.join(stage, 'assets/icon.png'))
+// Logo for the startup splash
+fs.copyFileSync(path.join(root, 'build/logo-app.png'), path.join(stage, 'assets/logo-app.png'))
 fs.writeFileSync(path.join(stage, 'package.json'), JSON.stringify({
   name: 'easychurch-suite',
   productName: 'EasyChurch Suite',
@@ -113,7 +121,7 @@ fs.writeFileSync(path.join(stage, 'package.json'), JSON.stringify({
 }, null, 2))
 
 step('electron-builder (NSIS x64)')
-// Regenerate with: npx electron scripts/make-icon.cjs (from build/icon.svg)
+// Regenerate with: npx electron scripts/make-icon.cjs (from build/icon-launcher.jpg + icon-app.jpg)
 const icon = path.join(root, 'build/icon.ico')
 const config = {
   appId: 'id.easychurch.suite',
@@ -122,7 +130,7 @@ const config = {
   electronDist: path.join(root, 'node_modules/electron/dist'),
   directories: { app: stage, output: release },
   files: ['dist-electron/**/*', 'assets/**/*', 'package.json'],
-  extraResources: ['server', 'ffmpeg', 'seed'].map(d => ({ from: path.join(stage, d), to: d, filter: ['**/*'] })),
+  extraResources: ['server', 'ffmpeg', 'seed', 'backgrounds'].map(d => ({ from: path.join(stage, d), to: d, filter: ['**/*'] })),
   npmRebuild: false,
   win: { target: [{ target: 'nsis', arch: ['x64'] }], icon },
   nsis: {

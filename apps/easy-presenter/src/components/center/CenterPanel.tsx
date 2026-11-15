@@ -270,8 +270,8 @@ export function CenterPanel({
 
       {/* ── SCRIPTURE FULL-PANEL MONITOR VIEW ── */}
       {isScripture ? (
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="flex flex-col overflow-hidden min-h-0" style={{ flex: '50 1 0' }}>
+        <div className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0">
+        <div className="flex flex-col overflow-hidden min-h-0" style={{ flex: '50 1 0', minHeight: 260 }}>
           {/* Monitor canvas — fills all available space */}
           <div ref={monitorAreaRef} className="flex-1 relative overflow-hidden m-3 mb-2 rounded-2xl min-h-0 cursor-pointer"
             onDoubleClick={() => onGoLiveSlide(activeSlideId)}
@@ -460,9 +460,11 @@ export function CenterPanel({
           )}
         </div>
       ) : (
-        <>
+        // Sections share the height by ratio but never shrink below a usable minimum —
+        // on short screens (1366×768, 150% scaling) the column scrolls instead of squashing them
+        <div className="flex-1 flex flex-col overflow-x-hidden overflow-y-auto min-h-0">
           {/* ── SLIDE GRID — 50 (presentation decks: full height) ── */}
-          <div className="overflow-hidden min-h-0" style={{ flex: '50 1 0' }}>
+          <div className="overflow-hidden min-h-0" style={{ flex: '50 1 0', minHeight: 180 }}>
             <SlideGrid
               slides={item.slides}
               activeSlideId={activeSlideId}
@@ -479,7 +481,7 @@ export function CenterPanel({
 
           {!isDeck && (<>
           {/* ── BACKGROUND PLAYLIST | TAP TEMPO — 25 ── */}
-          <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '25 1 0' }}>
+          <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '25 1 0', minHeight: 140 }}>
             {(() => {
               const tabs = isSong ? (
                 <div className="flex items-center gap-3 h-full">
@@ -561,7 +563,7 @@ export function CenterPanel({
             onAddToPlaylist={entry => onUpdateItem({ bgPlaylist: playlistInsert(item.bgPlaylist ?? [], entry) })}
           />
           </>)}
-        </>
+        </div>
       )}
     </div>
   )

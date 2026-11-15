@@ -24,6 +24,7 @@ import type { TextAnimation, MediaControl, MediaStatus } from './types'
 import { DEFAULT_MEDIA_CONTROL } from './types'
 import type { ScriptureAddPayload } from './left/ScriptureSearch'
 import type { MediaFile } from './left/MediaLibrary'
+import { useUiScale } from '@/hooks/useUiScale'
 
 // Shown while the Urutan Ibadah is empty; never part of `items`, so edits to it are no-ops
 const EMPTY_ITEM: ServiceItem = {
@@ -76,6 +77,14 @@ export function UnifiedLayout() {
   const bgLibrary                         = useBgLibrary()
   const { settings: appSettings, save: saveAppSettings } = useAppSettings()
   const [showSettings, setShowSettings]   = useState(false)
+  const ui = useUiScale()
+  const [scaleToast, setScaleToast]       = useState(false)
+  useEffect(() => {
+    if (!ui.changedAt) return
+    setScaleToast(true)
+    const t = setTimeout(() => setScaleToast(false), 1500)
+    return () => clearTimeout(t)
+  }, [ui.changedAt])
   const [currentScene, setCurrentScene]   = useState<SceneRef | null>(null)
   const [mediaControl, setMediaControl]   = useState<MediaControl>(DEFAULT_MEDIA_CONTROL)
   const [mediaStatus, setMediaStatus]     = useState<MediaStatus>({ url: null, currentTime: 0, duration: 0, ended: false })
@@ -570,7 +579,8 @@ ${name}` }],
     : activeItem
 
   return (
-    <div className="flex flex-col h-screen select-none" style={{ background: '#0f1117', color: '#f1f5f9' }}>
+    <div className="flex flex-col select-none"
+      style={{ background: '#0f1117', color: '#f1f5f9', zoom: ui.zoom, height: `${100 / ui.zoom}vh` }}>
       <TopBar
         isLive={isLive}
         isBlank={isBlank}
@@ -671,6 +681,14 @@ ${name}` }],
         remotes={remoteClients}
         onOpenRemote={() => setShowRemote(true)}
       />
+
+      {scaleToast && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg text-xs font-semibold pointer-events-none"
+          style={{ background: 'rgba(15,17,23,0.92)', border: '1px solid #2a3347', color: '#e2e8f0', zIndex: 100 }}>
+          Ukuran tampilan {Math.round(ui.zoom * 100)}%{ui.mode === 'auto' ? ' (otomatis)' : ''}
+          <span style={{ color: '#64748b' }}> · Ctrl + / − · Ctrl 0 = otomatis</span>
+        </div>
+      )}
 
       {showRemote && <RemoteModal clients={remoteClients} onClose={() => setShowRemote(false)} />}
 

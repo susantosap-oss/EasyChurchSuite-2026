@@ -49,7 +49,7 @@ export function RightPanel(props: Props) {
   return (
     <div
       className="flex flex-col flex-shrink-0 overflow-hidden"
-      style={{ width: 300, height: '100%', borderLeft: '1px solid #2a3347', background: '#0f1117' }}
+      style={{ width: '20%', minWidth: 250, maxWidth: 300, height: '100%', borderLeft: '1px solid #2a3347', background: '#0f1117' }}
     >
       {/* ── OUTPUT — as tall as its content (max 50%), the rest goes to Format / Studio ── */}
       <div

@@ -153,6 +153,8 @@ function createOperatorWindow() {
     backgroundColor: '#0f172a',
     titleBarStyle: 'hiddenInset',
     frame: process.platform !== 'darwin',
+    // The default File/Edit/View menu bar only eats vertical space (Alt still shows it)
+    autoHideMenuBar: true,
     webPreferences: webPreferences(),
     title: 'EasyChurch Suite',
     show: false,

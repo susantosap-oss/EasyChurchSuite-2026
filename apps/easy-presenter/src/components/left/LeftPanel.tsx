@@ -46,7 +46,7 @@ export function LeftPanel({
     <>
       <div
         className="flex flex-col flex-shrink-0"
-        style={{ width: 268, borderRight: '1px solid #2a3347', background: '#0f1117' }}
+        style={{ width: '18%', minWidth: 220, maxWidth: 268, borderRight: '1px solid #2a3347', background: '#0f1117' }}
       >
         {/* ── Service Order section ── */}
         <div className="flex flex-col flex-shrink-0" style={{ height: `${splitPos}%` }}>

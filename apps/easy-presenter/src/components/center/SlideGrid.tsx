@@ -1,12 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { useElementWidth } from '../../hooks/useElementWidth'
 import { SlideCanvas } from '../shared/SlideCanvas'
 import type { Slide, SlideBackground, TextStyle, TextAnimation } from '../types'
 import { animGroupKey } from '../types'
 import { groupColor } from '../left/AddSongModal'
 
 const JEDA_OPTIONS = [1, 2, 4, 8]
+/** Smallest card width — readable text on low-res screens; wider screens get more / bigger cards */
+const MIN_CARD_W = 140
+const GAP = 8   // matches gap-2
 
 interface Props {
   slides: Slide[]
@@ -26,6 +30,11 @@ export function SlideGrid({
   onSelect, onGoLive, onUpdateSlide, isItemLive = false, groupAnimations,
 }: Props) {
   const [jedaEditId, setJedaEditId] = useState<string | null>(null)
+  // Real card width, so thumbnail text scales with the card instead of a fixed 110px guess
+  const gridRef = useRef<HTMLDivElement>(null)
+  const gridW   = useElementWidth(gridRef)
+  const cols    = Math.max(1, Math.floor((gridW + GAP) / (MIN_CARD_W + GAP)))
+  const cardW   = gridW ? (gridW - GAP * (cols - 1)) / cols : MIN_CARD_W
 
   return (
     <div className="h-full overflow-y-auto p-4">
@@ -40,7 +49,7 @@ export function SlideGrid({
           </>
         )}
       </div>
-      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))' }}>
+      <div ref={gridRef} className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${MIN_CARD_W}px, 1fr))` }}>
         {slides.map((slide, idx) => {
           const isActive = slide.id === activeSlideId
           const isLive   = slide.id === liveSlideId
@@ -74,7 +83,7 @@ export function SlideGrid({
                 {/* 16:9 preview */}
                 <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
                   <div className="absolute inset-0">
-                    <SlideCanvas text={slide.text} background={bg} textStyle={ts} containerWidth={110} image={slide.image} thumbnail />
+                    <SlideCanvas text={slide.text} background={bg} textStyle={ts} containerWidth={cardW} image={slide.image} thumbnail />
                   </div>
 
                   {(slide.backgroundOverride || slide.textStyleOverride) && (

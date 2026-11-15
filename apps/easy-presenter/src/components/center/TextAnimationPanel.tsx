@@ -111,7 +111,7 @@ export function TextAnimationPanel({ item, activeSlide, background, onChangeDefa
   const previewStyle = { ...resolveTextStyle(item, previewSlide), animation: anim }
 
   return (
-    <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '20 1 0' }}>
+    <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '20 1 0', minHeight: 120 }}>
       {/* Header */}
       <div className="flex items-center gap-2 px-3 h-7 flex-shrink-0"
         style={{ background: '#161b27', borderBottom: '1px solid #2a3347', borderTop: '1px solid #2a3347' }}>

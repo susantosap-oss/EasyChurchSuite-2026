@@ -209,7 +209,7 @@ export function BackgroundPlaylistPanel({
   })
 
   return (
-    <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: embedded ? '1 1 0' : '25 1 0' }}>
+    <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: embedded ? '1 1 0' : '25 1 0', minHeight: embedded ? 0 : 140 }}>
       <PanelHeader title={title ?? 'Background Playlist'}>
         <span className="text-[9px]" style={{ color: '#94a3b8' }}>Klik = ganti background live · Shift+←/→</span>
         <div className="flex-1" />
@@ -245,7 +245,7 @@ export function BackgroundPlaylistPanel({
             </p>
           </div>
         ) : (
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}>
             {playlist.map((entry, idx) => {
               const active = entry.id === activeBgId
               return (
@@ -316,7 +316,7 @@ export function BackgroundLibraryPanel({ lib, onAddToPlaylist }: LibraryProps) {
   const items = filter === 'all' ? lib.library : lib.library.filter(e => e.group === filter)
 
   return (
-    <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '15 1 0' }}>
+    <div className="flex flex-col min-h-0 overflow-hidden" style={{ flex: '15 1 0', minHeight: 110 }}>
       <PanelHeader title="Background Library">
         <div className="flex gap-0.5">
           {FILTERS.map(f => (

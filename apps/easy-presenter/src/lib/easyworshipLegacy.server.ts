@@ -93,6 +93,10 @@ export function readEasyWorshipLegacy(db: Buffer, mb: Buffer): { songs: LegacySo
       } else if (blockType === 3) {
         if (subBlock > 63) return Buffer.alloc(0)       // sub-allocated block: 64 small blobs max
         dataStart = blockStart + mb[blockStart + 12 + 5 * subBlock]! * 16
+      } else if (blockType === 4 && blockStart + 9 <= mb.length && mb.readUInt32LE(blockStart + 3) === blobSize) {
+        // Block flagged "free" but the record still points at it and its length header matches:
+        // EasyWorship still shows this song, so read it like a single blob block
+        dataStart = blockStart + 9
       } else {
         return Buffer.alloc(0)
       }

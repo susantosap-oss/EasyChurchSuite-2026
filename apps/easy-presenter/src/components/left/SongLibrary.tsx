@@ -59,14 +59,16 @@ export function SongLibrary({ onAdd }: Props) {
   )
 
   const addToService = (song: DbSong) => {
+    const itemId = `song_${song.id}_${Date.now()}`
     const item: ServiceItem = {
-      id: `song_${song.id}_${Date.now()}`,
+      id: itemId,
       songId: song.id,
       type: 'song',
       title: song.title,
       subtitle: song.artist || '',
       slides: song.slides.map(s => ({
-        id: `song_${song.id}_s${s.slide_order}`,
+        // Per service item: the same song can be in the service more than once
+        id: `${itemId}_s${s.slide_order}`,
         label: s.label || `Slide ${s.slide_order}`,
         text: s.lyrics,
       })),

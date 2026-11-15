@@ -18,7 +18,7 @@ import { applyAppDefaults, defaultTextStyle, chromaColor, chromaApplies } from '
 import { SettingsModal } from './settings/SettingsModal'
 import { openOutputChannel, type OutputMessage, type OutputState, type RunningText } from '@/lib/outputBus'
 import type { ServiceItem, SlideBackground, TextStyle, Slide } from './types'
-import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextStyle, pickedBackground } from './types'
+import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextStyle, pickedBackground, withUniqueSlideIds } from './types'
 import type { SceneRef } from './left/SaveSceneModal'
 import type { TextAnimation, MediaControl, MediaStatus } from './types'
 import { DEFAULT_MEDIA_CONTROL } from './types'
@@ -344,7 +344,7 @@ ${name}` }],
 
   // App defaults (Settings ⚙) apply unless the song already has its own saved defaults
   const handleAddSong = (raw: ServiceItem, hasSavedSettings = false) => {
-    const item = hasSavedSettings ? raw : applyAppDefaults(raw, appSettings)
+    const item = withUniqueSlideIds(hasSavedSettings ? raw : applyAppDefaults(raw, appSettings), items)
     setItems(prev => [...prev, item])
     setActiveItemId(item.id)
     setActiveSlideId(item.slides[0]!.id)
@@ -465,12 +465,17 @@ ${name}` }],
   const handleLoadScene = (loadedItems: ServiceItem[], scene: SceneRef) => {
     if (!loadedItems.length) return
     setCurrentScene(scene)
-    setItems(loadedItems.filter(i => i.id !== '__quick__').map(item => ({
-      ...item,
-      background: item.background ?? (item.type === 'song' ? DEFAULT_SONG_BG : DEFAULT_SCRIPTURE_BG),
-      textStyle: item.textStyle ?? DEFAULT_TEXT_STYLE,
-    })))
-    const first = loadedItems[0]!
+    // Scenes saved before slide ids were unique per item may hold the same song twice
+    const normalized: ServiceItem[] = []
+    for (const item of loadedItems.filter(i => i.id !== '__quick__')) {
+      normalized.push(withUniqueSlideIds({
+        ...item,
+        background: item.background ?? (item.type === 'song' ? DEFAULT_SONG_BG : DEFAULT_SCRIPTURE_BG),
+        textStyle: item.textStyle ?? DEFAULT_TEXT_STYLE,
+      }, normalized))
+    }
+    setItems(normalized)
+    const first = normalized[0] ?? loadedItems[0]!
     setActiveItemId(first.id)
     setActiveSlideId(first.slides[0]?.id ?? '')
     setLiveSlideId(null)

@@ -122,6 +122,20 @@ export function pickedBackground(item: ServiceItem): SlideBackground | undefined
   return item.bgPlaylist?.find(e => e.id === item.activeBgId)?.background
 }
 
+/**
+ * Give every slide of `item` an id that no other service item uses. Slide ids identify what is
+ * live, so the same song added twice must not share them — otherwise the output follows the
+ * first copy and ignores background / animation changes made on the other one.
+ */
+export function withUniqueSlideIds(item: ServiceItem, others: ServiceItem[]): ServiceItem {
+  const taken = new Set(others.filter(o => o.id !== item.id).flatMap(o => o.slides.map(s => s.id)))
+  const ids = item.slides.map(s => s.id)
+  const clean = ids.every(id => !taken.has(id)) && new Set(ids).size === ids.length
+  if (clean) return item
+  const base = `${item.id}_${Math.random().toString(36).slice(2, 6)}`
+  return { ...item, slides: item.slides.map((s, i) => ({ ...s, id: `${base}_s${i + 1}` })) }
+}
+
 /** DB song id of an item — older scenes only encoded it in the item id ("song_12_…") */
 export function songIdOf(item: ServiceItem): number | undefined {
   if (item.type !== 'song') return undefined

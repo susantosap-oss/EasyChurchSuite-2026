@@ -6,6 +6,7 @@ import { applySongSettings, SONG_SETTINGS_SAVED, type SongSettingsSavedDetail } 
 import { DEFAULT_SONG_BG, DEFAULT_TEXT_STYLE } from '../types'
 import { AddSongModal } from './AddSongModal'
 import { ImportSongsModal } from './ImportSongsModal'
+import { SpellReviewModal } from './SpellReviewModal'
 
 interface DbSong {
   id: number
@@ -26,6 +27,8 @@ export function SongLibrary({ onAdd }: Props) {
   const [loading, setLoading]   = useState(true)
   const [showAdd, setShowAdd]       = useState(false)
   const [showImport, setShowImport] = useState(false)
+  /** Typo review: all songs (null ids) or just the imported ones */
+  const [spellReview, setSpellReview] = useState<{ ids?: number[] } | null>(null)
   const [confirmId, setConfirmId]   = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
@@ -125,6 +128,14 @@ export function SongLibrary({ onAdd }: Props) {
                 style={{ color: '#e2e8f0' }}
               />
             </div>
+            <button
+              onClick={() => setSpellReview({})}
+              className="px-2 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+              style={{ background: '#1e2535', color: '#94a3b8', border: '1px solid #2a3347' }}
+              title="Periksa ejaan (typo) semua lagu"
+            >
+              Aa✓
+            </button>
             <button
               onClick={() => setShowImport(true)}
               className="px-2 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
@@ -241,6 +252,15 @@ export function SongLibrary({ onAdd }: Props) {
         <ImportSongsModal
           onClose={() => setShowImport(false)}
           onImported={fetchSongs}
+          onReviewSpelling={ids => { setShowImport(false); setSpellReview({ ids }) }}
+        />
+      )}
+
+      {spellReview && (
+        <SpellReviewModal
+          ids={spellReview.ids}
+          onClose={() => setSpellReview(null)}
+          onChanged={fetchSongs}
         />
       )}
     </>

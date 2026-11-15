@@ -5,6 +5,8 @@ import type { ServiceItem } from '../types'
 import { DEFAULT_SONG_BG, DEFAULT_TEXT_STYLE } from '../types'
 import { SlideCanvas } from '../shared/SlideCanvas'
 import { parseLyrics } from '@/lib/lyrics'
+import { replaceWord } from '@/lib/spell/text'
+import { useSpellCheck, WordFixChip, addToDictionary } from './SpellCheck'
 
 interface Props {
   onClose: () => void
@@ -45,6 +47,25 @@ export function AddSongModal({ onClose, onAdded }: Props) {
   const [dbFailed, setDbFailed] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // ── Typo check (Indonesian + English), runs while typing ──
+  const [ignored, setIgnored]           = useState<Set<string>>(new Set())
+  const [confirmTypos, setConfirmTypos] = useState(false)
+  const spell = useSpellCheck([lyrics, title], ignored)
+
+  const ignoreWord = (w: string) => setIgnored(prev => new Set(prev).add(w.toLowerCase()))
+  const fixWord = (from: string, to: string) => {
+    setLyrics(prev => replaceWord(prev, from, to).text)
+    setTitle(prev => replaceWord(prev, from, to).text)
+    // the corrected word must not be re-flagged if the user typed their own fix
+    ignoreWord(to)
+  }
+  const fixAll = () => {
+    let l = lyrics, t = title
+    for (const w of spell.words) { l = replaceWord(l, w.word, w.suggestion).text; t = replaceWord(t, w.word, w.suggestion).text }
+    setLyrics(l); setTitle(t)
+    return { lyrics: l, title: t }
+  }
+
   const slides = useMemo(() => parseLyrics(lyrics, maxLines), [lyrics, maxLines])
   const groupCount = useMemo(
     () => slides.filter((s, i) => i === 0 || slides[i - 1]!.label !== s.label).length,
@@ -73,13 +94,13 @@ export function AddSongModal({ onClose, onAdded }: Props) {
     })
   }
 
-  const buildItem = (idBase: string, songId?: number): ServiceItem => ({
+  const buildItem = (idBase: string, songId?: number, t = title, sl = slides): ServiceItem => ({
     id: idBase,
     songId,
     type: 'song',
-    title: title.trim(),
+    title: t.trim(),
     subtitle: artist.trim(),
-    slides: slides.map((s, i) => ({ id: `${idBase}_s${i + 1}`, label: s.label, text: s.lyrics })),
+    slides: sl.map((s, i) => ({ id: `${idBase}_s${i + 1}`, label: s.label, text: s.lyrics })),
     background: { ...DEFAULT_SONG_BG },
     textStyle: { ...DEFAULT_TEXT_STYLE },
   })
@@ -90,22 +111,32 @@ export function AddSongModal({ onClose, onAdded }: Props) {
     return true
   }
 
-  const handleSave = async () => {
+  /** mode: 'check' = stop and ask when typos remain, 'fix' = fix all first, 'asis' = save unchanged */
+  const handleSave = async (mode: 'check' | 'fix' | 'asis' = 'check') => {
     setError('')
     setDbFailed(false)
     if (!validate()) return
+    if (mode === 'check' && spell.words.length) { setConfirmTypos(true); return }
+    setConfirmTypos(false)
+
+    let saveTitle = title, saveSlides = slides
+    if (mode === 'fix') {
+      const fixed = fixAll()
+      saveTitle  = fixed.title
+      saveSlides = parseLyrics(fixed.lyrics, maxLines)
+    }
 
     setSaving(true)
     try {
       const res = await fetch('/api/songs/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim(), artist: artist.trim(), slides }),
+        body: JSON.stringify({ title: saveTitle.trim(), artist: artist.trim(), slides: saveSlides }),
       })
       const data = await res.json() as { id?: number; error?: string }
       if (!res.ok || data.error) throw new Error(data.error ?? 'Gagal menyimpan')
 
-      onAdded(buildItem(`song_${data.id}`, data.id))
+      onAdded(buildItem(`song_${data.id}`, data.id, saveTitle, saveSlides))
       onClose()
     } catch (err) {
       setError(`Gagal simpan ke database: ${err instanceof Error ? err.message : 'Terjadi kesalahan'}`)
@@ -270,6 +301,48 @@ export function AddSongModal({ onClose, onAdded }: Props) {
           </div>
         </div>
 
+        {/* ── Spell check strip ── */}
+        {spell.available && (lyrics.trim() || title.trim()) && (
+          <div className="mx-5 mb-2 px-3 py-2 rounded-lg flex items-start gap-2 flex-shrink-0"
+            style={{ background: '#0f1117', border: `1px solid ${spell.words.length ? '#78350f' : '#2a3347'}` }}>
+            <span className="text-[10px] font-semibold uppercase tracking-wider pt-1 flex-shrink-0"
+              style={{ color: spell.words.length ? '#fbbf24' : '#86efac' }}>
+              {spell.words.length ? `⚠ ${spell.words.length} kemungkinan typo` : spell.checking ? 'Memeriksa ejaan…' : '✓ Ejaan OK'}
+            </span>
+            <div className="flex-1 flex flex-wrap gap-1.5 overflow-y-auto min-w-0" style={{ maxHeight: 64 }}>
+              {spell.words.map(w => (
+                <WordFixChip key={w.word.toLowerCase()} issue={w}
+                  onFix={to => fixWord(w.word, to)}
+                  onIgnore={() => ignoreWord(w.word)}
+                  onAddDict={() => { ignoreWord(w.word); addToDictionary(w.word) }}
+                />
+              ))}
+            </div>
+            {spell.words.length > 1 && (
+              <button onClick={() => fixAll()}
+                className="text-[10px] px-2.5 py-1 rounded font-semibold flex-shrink-0"
+                style={{ background: '#14532d', color: '#86efac', border: '1px solid #166534' }}
+              >✓ Perbaiki semua</button>
+            )}
+          </div>
+        )}
+
+        {/* Typos left when saving */}
+        {confirmTypos && spell.words.length > 0 && (
+          <div className="mx-5 mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-3 flex-shrink-0"
+            style={{ background: '#2a1800', color: '#fed7aa', border: '1px solid #78350f' }}>
+            <span className="flex-1">Masih ada {spell.words.length} kemungkinan typo. Perbaiki dulu sebelum disimpan?</span>
+            <button onClick={() => handleSave('fix')}
+              className="px-3 py-1 rounded text-[11px] font-semibold"
+              style={{ background: '#14532d', color: '#86efac', border: '1px solid #166534' }}
+            >✓ Perbaiki semua &amp; simpan</button>
+            <button onClick={() => handleSave('asis')}
+              className="px-3 py-1 rounded text-[11px]"
+              style={{ background: '#1e2535', color: '#94a3b8', border: '1px solid #2a3347' }}
+            >Simpan apa adanya</button>
+          </div>
+        )}
+
         {/* Error */}
         {error && (
           <div className="mx-5 mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-3"
@@ -296,7 +369,7 @@ export function AddSongModal({ onClose, onAdded }: Props) {
             Batal
           </button>
           <button
-            onClick={handleSave}
+            onClick={() => handleSave()}
             disabled={saving}
             className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
             style={{

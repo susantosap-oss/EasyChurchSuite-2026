@@ -23,6 +23,8 @@ db.transaction(() => {
     db.exec(`DELETE FROM ${t}`)
   }
   db.exec("DELETE FROM app_settings WHERE key = 'presenter.settings'")
+  // Church dictionary words added while testing
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'spell_words'").get()) db.exec('DELETE FROM spell_words')
   db.exec("DELETE FROM sqlite_sequence WHERE name IN ('songs','song_slides','playlists','playlist_items','catatan','highlights','renungan_cache')")
   // External-content FTS tables: rebuild from their (now empty) source tables
   db.exec("INSERT INTO songs_fts(songs_fts) VALUES('rebuild')")

@@ -30,6 +30,11 @@ function migrate(db: Database.Database) {
   if (songCols.length && !songCols.some(c => c.name === 'settings')) {
     db.exec('ALTER TABLE songs ADD COLUMN settings TEXT')
   }
+  // Church dictionary for the lyric spell checker (words marked "correct" by the operator)
+  db.exec(`CREATE TABLE IF NOT EXISTS spell_words (
+    word     TEXT PRIMARY KEY,
+    added_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+  )`)
 }
 
 export function getPresenterDb(): DbInstance {

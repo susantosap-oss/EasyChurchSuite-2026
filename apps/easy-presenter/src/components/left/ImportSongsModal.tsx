@@ -5,6 +5,8 @@ import { useRef, useState } from 'react'
 interface Props {
   onClose: () => void
   onImported: () => void
+  /** Open the typo review for the songs just imported */
+  onReviewSpelling: (ids: number[]) => void
 }
 
 const FORMAT_EXAMPLE = `{
@@ -20,13 +22,16 @@ const FORMAT_EXAMPLE = `{
   ]
 }`
 
-export function ImportSongsModal({ onClose, onImported }: Props) {
+export function ImportSongsModal({ onClose, onImported, onReviewSpelling }: Props) {
   const fileRef  = useRef<HTMLInputElement>(null)
   const [files, setFiles]     = useState<File[]>([])
   const [status, setStatus]   = useState<'idle' | 'importing' | 'done' | 'error'>('idle')
   const [result, setResult]   = useState<{ imported?: number; skipped?: number; total?: number } | null>(null)
   const [error, setError]     = useState('')
   const [showFormat, setShowFormat] = useState(false)
+  // Typo check of the imported songs: null = not run / running
+  const [spell, setSpell] = useState<{ ids: number[]; songs: number; words: number } | null>(null)
+  const [spellChecking, setSpellChecking] = useState(false)
 
   const pickFiles = (list: FileList | null) => {
     const picked = Array.from(list ?? []).filter(f => /\.(db|json)$/i.test(f.name))
@@ -49,12 +54,24 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
       files.forEach(f => form.append('file', f))
       const res  = await fetch('/api/songs/import-db/', { method: 'POST', body: form })
       const json = await res.json() as {
-        success?: boolean; imported?: number; skipped?: number; total?: number; error?: string
+        success?: boolean; imported?: number; skipped?: number; total?: number; ids?: number[]; error?: string
       }
       if (!res.ok || json.error) throw new Error(json.error ?? 'Gagal import')
       setResult({ imported: json.imported, skipped: json.skipped, total: json.total })
       setStatus('done')
       onImported()
+      // Check the new songs for typos right away
+      if (json.ids?.length) {
+        setSpellChecking(true)
+        fetch(`/api/spell/songs/?ids=${json.ids.join(',')}`)
+          .then(r => r.json() as Promise<{ songs?: { id: number; issues: unknown[] }[] }>)
+          .then(d => {
+            const list = d.songs ?? []
+            setSpell({ ids: list.map(s => s.id), songs: list.length, words: list.reduce((n, s) => n + s.issues.length, 0) })
+          })
+          .catch(() => {})
+          .finally(() => setSpellChecking(false))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan')
       setStatus('error')
@@ -198,6 +215,29 @@ export function ImportSongsModal({ onClose, onImported }: Props) {
                 Daftar lagu telah diperbarui secara otomatis
               </p>
             </div>
+          )}
+
+          {/* Typo check of the imported songs */}
+          {status === 'done' && (spellChecking || spell) && (
+            spellChecking ? (
+              <div className="px-4 py-2.5 rounded-xl text-xs" style={{ background: '#0f1117', border: '1px solid #2a3347', color: '#94a3b8' }}>
+                Memeriksa ejaan lagu yang diimport…
+              </div>
+            ) : spell && spell.songs > 0 ? (
+              <div className="px-4 py-2.5 rounded-xl flex items-center gap-3" style={{ background: '#2a1800', border: '1px solid #78350f' }}>
+                <p className="flex-1 text-xs" style={{ color: '#fed7aa' }}>
+                  ⚠ <strong>{spell.words}</strong> kemungkinan typo di <strong>{spell.songs}</strong> lagu
+                </p>
+                <button onClick={() => onReviewSpelling(spell.ids)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
+                  style={{ background: '#14532d', color: '#86efac', border: '1px solid #166534' }}
+                >Periksa &amp; perbaiki</button>
+              </div>
+            ) : (
+              <div className="px-4 py-2.5 rounded-xl text-xs" style={{ background: '#0f1117', border: '1px solid #2a3347', color: '#86efac' }}>
+                ✓ Tidak ditemukan typo pada lagu yang diimport
+              </div>
+            )
           )}
         </div>
 

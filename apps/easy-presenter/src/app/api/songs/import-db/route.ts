@@ -6,6 +6,7 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { rtfToText } from '@/lib/rtf'
 import { parseLyrics } from '@/lib/lyrics'
+import { invalidateSpellDict } from '@/lib/spell/spell.server'
 
 type SongData = {
   title: string
@@ -35,8 +36,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { imported, skipped } = insertSongs(songs)
-    return NextResponse.json({ success: true, imported, skipped, total: songs.length })
+    const { imported, skipped, ids } = insertSongs(songs)
+    invalidateSpellDict()
+    return NextResponse.json({ success: true, imported, skipped, total: songs.length, ids })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: msg }, { status: 500 })
@@ -347,11 +349,13 @@ function insertSongs(songs: SongData[]) {
 
   let imported = 0
   let skipped  = 0
+  const ids: number[] = []
 
   const run = db.transaction(() => {
     for (const song of songs) {
       if (!song.title.trim() || existing.has(song.title.toLowerCase())) { skipped++; continue }
       const { lastInsertRowid } = insertSong.run(song.title.trim(), song.artist.trim())
+      ids.push(Number(lastInsertRowid))
       song.slides.forEach((s, i) => {
         insertSlide.run(lastInsertRowid, i + 1, s.label || `Slide ${i + 1}`, s.lyrics || '')
       })
@@ -360,5 +364,5 @@ function insertSongs(songs: SongData[]) {
   })
   run()
 
-  return { imported, skipped }
+  return { imported, skipped, ids }
 }

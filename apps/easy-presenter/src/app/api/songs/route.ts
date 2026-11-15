@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPresenterDb } from '@/lib/db.server'
+import { invalidateSpellDict } from '@/lib/spell/spell.server'
 
 export async function GET() {
   try {
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       })
     })
     insertAll()
+    invalidateSpellDict()
 
     return NextResponse.json({ id: songId, success: true })
   } catch (err) {

@@ -29,6 +29,12 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .btn.go{background:#2563eb;border-color:#2563eb}.btn.go.on{background:#dc2626;border-color:#dc2626}
 .btn.on{background:#854d0e;border-color:#a16207;color:#fef3c7}
 .btn.clr.on{background:#7c2d12;border-color:#c2410c;color:#fed7aa}
+.anim{margin:0 12px 8px}.anim.hide{display:none}
+.anim small{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#64748b;margin:2px 2px 6px}
+.ach{display:flex;gap:6px;flex-wrap:wrap}
+.ach button{padding:9px 12px;border-radius:999px;background:#2e1065;border:1px solid #6d28d9;font-size:13px;font-weight:600;white-space:nowrap}
+.ach button.on{background:#7c3aed;border-color:#a78bfa;color:#fff}
+.ach button.none{background:#1e293b;border-color:#334155;color:#fca5a5}.ach button.none.on{background:#7f1d1d;border-color:#b91c1c;color:#fff}
 .tabs{display:flex;gap:6px;margin:6px 12px 0}
 .tab{flex:1;padding:10px;border-radius:10px 10px 0 0;background:#111827;color:#64748b;font-weight:600;font-size:14px}
 .tab.on{background:#1e293b;color:#fff}
@@ -95,6 +101,7 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
   .colB{width:52%}
   .prev{min-height:0;margin:8px}.prev p{-webkit-line-clamp:4;font-size:14px}
   .row{margin:0 8px 6px}.btn{padding:11px 6px;font-size:15px}.btn.big{padding:14px 6px;font-size:17px}
+  .anim{margin:0 8px 6px}.ach button{padding:7px 10px}
   .tabs{margin:8px 8px 0}.list{margin:0 8px 8px}
   .mon{margin:8px}.speak .colA{width:58%}.speak .colB{width:42%}
   .pvw{margin:8px 8px 0;grid-template-columns:1fr}.pvw .info{display:none}
@@ -139,6 +146,7 @@ function renderOperator() {
   $('t2').className = 'tab' + (tab === 'items' ? ' on' : '');
   $('t3').className = 'tab' + (tab === 'bible' ? ' on' : '');
   $('t4').className = 'tab' + (tab === 'media' ? ' on' : '');
+  renderAnim();
   var pim = $('pvim');
   if (live && S.liveImage) { if (pim.getAttribute('data-u') !== S.liveImage) { pim.setAttribute('data-u', S.liveImage); pim.src = imgUrl(S.liveImage) } $('pv').className += ' pic' }
   var list = $('ls');
@@ -175,6 +183,27 @@ function renderOperator() {
       list.appendChild(b);
     });
   }
+}
+
+// Animasi Teks presets for the selected item (all its slides) — rebuilt only when they change,
+// so the chip row keeps its scroll position while live updates arrive
+var animKey = '';
+function renderAnim() {
+  var a = S && S.textAnim, box = $('an');
+  if (!a) { box.className = 'anim hide'; animKey = ''; return }
+  box.className = 'anim';
+  $('anl').textContent = 'ANIMASI TEKS · ' + (S.activeTitle || '') + (a.current === null ? ' (kustom)' : '');
+  var key = a.presets.join('|') + '#' + a.current;
+  if (key === animKey) return;
+  animKey = key;
+  var row = $('ach');
+  row.textContent = '';
+  a.presets.concat(['none']).forEach(function (name) {
+    var off = name === 'none';
+    var b = el('button', (off ? 'none' : '') + (a.current === name ? ' on' : ''), off ? '✕ Tanpa animasi' : name);
+    b.onclick = function () { send({ type: 'textAnim', preset: name }) };
+    row.appendChild(b);
+  });
 }
 
 function api(path) {
@@ -425,6 +454,7 @@ const OPERATOR_BODY = `
 <div class="prev" id="pv"><small id="pvl">Belum Live</small><p id="pvt"></p><img id="pvim" alt=""></div>
 <div class="row r2"><button class="btn big" id="pr">◄ Prev</button><button class="btn big" id="nx2">Next ►</button></div>
 <div class="row r3"><button class="btn go" id="go">● Go Live</button><button class="btn" id="bl">Blank</button><button class="btn clr" id="cl">Clear</button></div>
+<div class="anim hide" id="an"><small id="anl">ANIMASI TEKS</small><div class="ach" id="ach"></div></div>
 </div><div class="colB">
 <div class="tabs"><button class="tab on" id="t1">Slide</button><button class="tab" id="t2">Urutan</button><button class="tab" id="t3">Alkitab</button><button class="tab" id="t4">Media</button></div>
 <div class="list" id="ls"></div>

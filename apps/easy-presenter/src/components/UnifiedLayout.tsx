@@ -22,7 +22,8 @@ import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextS
 import { AddSongModal, SONG_EDITED, type EditableSong } from './left/AddSongModal'
 import type { SceneRef } from './left/SaveSceneModal'
 import type { TextAnimation, MediaControl, MediaStatus } from './types'
-import { DEFAULT_MEDIA_CONTROL } from './types'
+import { DEFAULT_MEDIA_CONTROL, DEFAULT_TEXT_ANIMATION } from './types'
+import { TEXT_ANIM_PRESETS, presetAnimation, presetNameOf } from './center/TextAnimationPanel'
 import type { ScriptureAddPayload } from './left/ScriptureSearch'
 import type { MediaFile } from './left/MediaLibrary'
 import { useUiScale } from '@/hooks/useUiScale'
@@ -570,6 +571,10 @@ ${name}` }],
       ? { id: liveItem.id.slice(DECK_PREFIX.length), page: Math.max(0, liveItem.slides.findIndex(s => s.id === liveSlideId)) }
       : null,
     liveImage: isLive && !isBlank ? (rawLiveSlide?.image ?? (liveMediaType === 'image' ? liveMediaUrl ?? null : null)) : null,
+    textAnim: isEmpty || activeItem.type === 'media' ? null : {
+      presets: TEXT_ANIM_PRESETS.map(p => p.name),
+      current: presetNameOf(activeItem.textStyle.animation),
+    },
   }
   const remoteJson = JSON.stringify(remoteSnapshot)
   useEffect(() => { window.electronAPI?.remoteSendState?.(remoteJson) }, [remoteJson])
@@ -617,6 +622,15 @@ ${name}` }],
       case 'liveSlide': {
         const item = items.find(i => i.id === cmd.itemId)
         if (item?.slides.some(s => s.id === cmd.slideId)) { setActiveItemId(item.id); handleGoLiveSlide(cmd.slideId) }
+        break
+      }
+      case 'textAnim': {
+        // Same as a preset button in Animasi Teks with "Semua slide" — on the selected item
+        if (isEmpty || activeItem.type === 'media') break
+        const current = activeItem.textStyle.animation ?? DEFAULT_TEXT_ANIMATION
+        if (cmd.preset === 'none') { updateTextStyle({ animation: { ...DEFAULT_TEXT_ANIMATION } }); break }
+        const preset = TEXT_ANIM_PRESETS.find(p => p.name === cmd.preset)
+        if (preset) updateTextStyle({ animation: presetAnimation(preset.anim, current) })
         break
       }
     }

@@ -27,6 +27,11 @@ export interface RemoteSnapshot {
   liveDeck: { id: string; page: number } | null
   /** Picture on air (presentation page / image), for the Speaker live view */
   liveImage: string | null
+  /**
+   * Operator: Animasi Teks presets for the selected item (null when it has no text, e.g. a video);
+   * current = preset in use, 'none' = off, null = hand-tuned in the app
+   */
+  textAnim: { presets: string[]; current: string | null } | null
 }
 
 export type RemoteCommand =
@@ -40,6 +45,8 @@ export type RemoteCommand =
   | { type: 'deckStep'; delta: 1 | -1 }
   /** Operator: open a Media library file as a service item (selected, not yet live) */
   | { type: 'media'; file: string }
+  /** Operator: Animasi Teks preset (by name, 'none' = off) for the selected item, all its slides */
+  | { type: 'textAnim'; preset: string }
 
 export const ITEM_KIND: Record<ItemType, string> = {
   song: 'Lagu', scripture: 'Alkitab', announcement: 'Pengumuman', media: 'Media',

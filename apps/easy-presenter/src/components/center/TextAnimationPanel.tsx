@@ -40,7 +40,20 @@ const UNIT_OPTIONS: { id: TextAnimUnit; label: string }[] = [
   { id: 'char',  label: 'Huruf' },
 ]
 
-const PRESETS: { name: string; anim: Partial<TextAnimation> }[] = [
+/** A preset applied on top of the current animation (keeps its glow colour) */
+export function presetAnimation(preset: Partial<TextAnimation>, current: TextAnimation): TextAnimation {
+  return { ...DEFAULT_TEXT_ANIMATION, glowColor: current.glowColor, ...preset }
+}
+
+/** Name of the preset this animation is; 'none' when off; null when hand-tuned */
+export function presetNameOf(anim: TextAnimation | undefined): string | null {
+  const a = anim ?? DEFAULT_TEXT_ANIMATION
+  if (a.enter === 'none' && a.loop === 'none') return 'none'
+  return TEXT_ANIM_PRESETS.find(p => JSON.stringify(presetAnimation(p.anim, a)) === JSON.stringify(a))?.name ?? null
+}
+
+/** Also offered on the Operator phone remote */
+export const TEXT_ANIM_PRESETS: { name: string; anim: Partial<TextAnimation> }[] = [
   { name: 'Smooth',       anim: { enter: 'fade',     loop: 'none',  unit: 'line', duration: 700, stagger: 150 } },
   { name: 'Worship Glow', anim: { enter: 'blur',     loop: 'glow',  unit: 'word', duration: 700, stagger: 80, loopSpeed: 3 } },
   { name: 'Neon Night',   anim: { enter: 'fade',     loop: 'neon',  unit: 'slide', duration: 500, loopSpeed: 4, glowColor: '#e879f9' } },
@@ -125,9 +138,9 @@ export function TextAnimationPanel({ item, activeSlide, background, onChangeDefa
         <div className="flex-1" />
         <span className="text-[10px]" style={{ color: '#94a3b8' }}>Preset:</span>
         <div className="flex gap-0.5 overflow-x-auto">
-          {PRESETS.map(p => (
+          {TEXT_ANIM_PRESETS.map(p => (
             <button key={p.name}
-              onClick={() => onChange({ ...DEFAULT_TEXT_ANIMATION, glowColor: anim.glowColor, ...p.anim })}
+              onClick={() => onChange(presetAnimation(p.anim, anim))}
               className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
               style={{ background: '#2e1065', color: '#ffffff', border: '1px solid #6d28d9' }}
             >{p.name}</button>

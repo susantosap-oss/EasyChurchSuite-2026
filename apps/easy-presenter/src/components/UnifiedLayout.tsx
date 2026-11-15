@@ -5,7 +5,7 @@ import { TopBar } from './TopBar'
 import { StatusBar } from './StatusBar'
 import { SecondScreenNotice } from './SecondScreenNotice'
 import { RemoteModal } from './RemoteModal'
-import { ITEM_KIND, type RemoteCommand, type RemoteSnapshot } from '@/lib/remote'
+import { ITEM_KIND, remoteBg, type RemoteCommand, type RemoteSnapshot } from '@/lib/remote'
 import { useSpeakerDecks, markSpeakerDeck, type SpeakerDeck } from '@/lib/speakerDecks'
 import { convertPdfToSlides } from '@/lib/pdfToSlides'
 import { LeftPanel } from './left/LeftPanel'
@@ -575,6 +575,10 @@ ${name}` }],
       presets: TEXT_ANIM_PRESETS.map(p => p.name),
       current: presetNameOf(activeItem.textStyle.animation),
     },
+    bgPlaylist: isEmpty || activeItem.type === 'media' ? null : {
+      entries: (activeItem.bgPlaylist ?? []).map(remoteBg),
+      activeId: activeItem.activeBgId ?? null,
+    },
   }
   const remoteJson = JSON.stringify(remoteSnapshot)
   useEffect(() => { window.electronAPI?.remoteSendState?.(remoteJson) }, [remoteJson])
@@ -631,6 +635,12 @@ ${name}` }],
         if (cmd.preset === 'none') { updateTextStyle({ animation: { ...DEFAULT_TEXT_ANIMATION } }); break }
         const preset = TEXT_ANIM_PRESETS.find(p => p.name === cmd.preset)
         if (preset) updateTextStyle({ animation: presetAnimation(preset.anim, current) })
+        break
+      }
+      case 'bg': {
+        // Same as clicking a tile in Background Playlist (live when the item is on air)
+        if (isEmpty || activeItem.type === 'media') break
+        if (cmd.id === null || activeItem.bgPlaylist?.some(e => e.id === cmd.id)) updateItem({ activeBgId: cmd.id ?? undefined })
         break
       }
     }

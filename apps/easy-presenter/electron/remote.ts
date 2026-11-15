@@ -24,8 +24,8 @@ const PREFERRED_PORT = 3902
 const MAX_BODY = 16 * 1024
 /** The Speaker may only open / step the presentations the operator marked for it */
 const SPEAKER_COMMANDS = new Set(['deck', 'deckStep'])
-/** Pictures phones may load through the remote: rendered presentation pages and library media */
-const IMAGE_PATH = /^\/api\/(slides|media)\/file\/[^?#]+$/
+/** Pictures phones may load through the remote: rendered presentation pages, library media, image backgrounds */
+const IMAGE_PATH = /^\/api\/(slides|media|backgrounds)\/file\/[^?#]+$/
 /** Pass-through service worker: no offline cache (the remote is live-only), but it makes the page installable */
 const SERVICE_WORKER = "self.addEventListener('install',function(){self.skipWaiting()});" +
   "self.addEventListener('activate',function(e){e.waitUntil(self.clients.claim())});" +

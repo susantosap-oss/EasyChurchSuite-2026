@@ -96,6 +96,18 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .md span{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .md i{font-style:normal;font-size:11px;color:#64748b;flex-shrink:0}
 .note{font-size:12px;color:#64748b;margin:2px 2px 8px}
+/* Background Playlist tab */
+.bgh{display:flex;align-items:center;gap:8px;margin:2px 2px 8px}.bgh .lh{flex:1;margin:0}
+.bgh button{padding:7px 12px;border-radius:999px;background:#0f172a;border:1px solid #334155;font-size:13px;font-weight:600;color:#cbd5e1;flex-shrink:0}
+.bgh button.on{background:#1e3a5f;border-color:#3b82f6;color:#fff}
+.bgg{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.bgt{position:relative;padding:0;border-radius:10px;overflow:hidden;background:#0f172a;border:2px solid #1f2937;text-align:left}
+.bgt .sw{position:relative;aspect-ratio:16/9;background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-size:16px;color:rgba(255,255,255,.85)}
+.bgt .sw img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.bgt span{display:block;padding:4px 6px;font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bgt i{position:absolute;top:5px;left:5px;font-style:normal;font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;background:#2563eb;color:#fff;display:none}
+.bgt.act{border-color:#3b82f6}.bgt.act i{display:block}
+.bgt.lv{border-color:#dc2626;box-shadow:0 0 0 3px rgba(220,38,38,.25)}.bgt.lv i{display:block;background:#dc2626}
 /* Landscape (default for the remote): two columns */
 @media (orientation:landscape){
   .main{flex-direction:row}
@@ -152,6 +164,7 @@ function renderOperator() {
   $('t2').className = 'tab' + (tab === 'items' ? ' on' : '');
   $('t3').className = 'tab' + (tab === 'bible' ? ' on' : '');
   $('t4').className = 'tab' + (tab === 'media' ? ' on' : '');
+  $('t5').className = 'tab' + (tab === 'bg' ? ' on' : '');
   renderAnim();
   var pim = $('pvim');
   if (live && S.liveImage) { if (pim.getAttribute('data-u') !== S.liveImage) { pim.setAttribute('data-u', S.liveImage); pim.src = imgUrl(S.liveImage) } $('pv').className += ' pic' }
@@ -161,6 +174,7 @@ function renderOperator() {
   list.textContent = '';
   if (tab === 'bible') { renderBible(list); return }
   if (tab === 'media') { renderMedia(list); return }
+  if (tab === 'bg') { renderBg(list); return }
   if (!S) { list.appendChild(el('div', 'empty', 'Menghubungkan…')); return }
   if (tab === 'slides') {
     if (!S.slides.length) { list.appendChild(el('div', 'empty', 'Belum ada item dipilih')); return }
@@ -210,6 +224,36 @@ function renderAnim() {
     b.onclick = function () { send({ type: 'textAnim', preset: name }) };
     row.appendChild(b);
   });
+}
+
+// Background Playlist of the selected item: tap a tile = that background (live when the item is on air)
+var BG_ICON = { video: '▶', animated: '✨', solid: '', gradient: '', image: '' };
+function renderBg(list) {
+  var p = S && S.bgPlaylist;
+  if (!S) { list.appendChild(el('div', 'empty', 'Menghubungkan…')); return }
+  if (!p) { list.appendChild(el('div', 'empty', S.slides.length ? 'Item ini (media) tidak memakai background' : 'Belum ada item dipilih')); return }
+  var onAir = S.isLive && S.liveItemId === S.activeItemId;
+  var head = el('div', 'bgh');
+  head.appendChild(el('div', 'lh', S.activeTitle));
+  var def = el('button', p.activeId ? '' : 'on', '↺ Default');
+  def.onclick = function () { send({ type: 'bg', id: null }) };
+  head.appendChild(def);
+  list.appendChild(head);
+  if (!p.entries.length) { list.appendChild(el('div', 'empty', 'Background Playlist kosong — tambahkan dulu di PC (panel Background Playlist)')); return }
+  var grid = el('div', 'bgg');
+  p.entries.forEach(function (e, i) {
+    var act = e.id === p.activeId;
+    var b = el('button', 'bgt' + (act ? (onAir ? ' lv' : ' act') : ''));
+    var sw = el('div', 'sw', BG_ICON[e.kind] || '');
+    sw.style.background = e.swatch;
+    if (e.image) { var im = el('img'); im.loading = 'lazy'; im.alt = ''; im.src = imgUrl(e.image); sw.appendChild(im) }
+    b.appendChild(sw);
+    b.appendChild(el('i', null, onAir ? 'LIVE' : 'DIPILIH'));
+    b.appendChild(el('span', null, (i + 1) + '. ' + e.name));
+    b.onclick = function () { send({ type: 'bg', id: e.id }) };
+    grid.appendChild(b);
+  });
+  list.appendChild(grid);
 }
 
 function api(path) {
@@ -437,6 +481,7 @@ document.addEventListener('DOMContentLoaded', function () {
     $('t2').onclick = function () { tab = 'items'; render() };
     $('t3').onclick = function () { tab = 'bible'; render() };
     $('t4').onclick = function () { tab = 'media'; M.files = null; render() };
+    $('t5').onclick = function () { tab = 'bg'; render() };
   } else {
     $('zm').onclick = function () { scale = Math.max(0.5, scale - 0.1); try { localStorage.setItem('ec-scale', scale) } catch (e) {} fitLive() };
     $('zp').onclick = function () { scale = Math.min(2, scale + 0.1); try { localStorage.setItem('ec-scale', scale) } catch (e) {} fitLive() };
@@ -462,7 +507,7 @@ const OPERATOR_BODY = `
 <div class="row r3"><button class="btn go" id="go">● Go Live</button><button class="btn" id="bl">Blank</button><button class="btn clr" id="cl">Clear</button></div>
 <div class="anim hide" id="an"><small id="anl">ANIMASI TEKS</small><div class="ach" id="ach"></div></div>
 </div><div class="colB">
-<div class="tabs"><button class="tab on" id="t1">Slide</button><button class="tab" id="t2">Urutan</button><button class="tab" id="t3">Alkitab</button><button class="tab" id="t4">Media</button></div>
+<div class="tabs"><button class="tab on" id="t1">Slide</button><button class="tab" id="t2">Urutan</button><button class="tab" id="t3">Alkitab</button><button class="tab" id="t4">Media</button><button class="tab" id="t5">BG</button></div>
 <div class="list" id="ls"></div>
 </div></div>
 `

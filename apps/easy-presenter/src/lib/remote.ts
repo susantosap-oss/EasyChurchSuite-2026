@@ -1,6 +1,6 @@
 // Phone remote (Operator / Speaker): what the operator window sends to phones and what the
 // Operator phone can ask for. The Electron main process relays both (electron/remote.ts).
-import type { ItemType } from '@/components/types'
+import type { ItemType, BgEntry } from '@/components/types'
 
 /** image: presentation page picture (shown as a thumbnail on the Operator phone) */
 export interface RemoteSlide { id: string; label: string; text: string; image?: string }
@@ -32,6 +32,34 @@ export interface RemoteSnapshot {
    * current = preset in use, 'none' = off, null = hand-tuned in the app
    */
   textAnim: { presets: string[]; current: string | null } | null
+  /** Operator: the selected item's Background Playlist (null for media items) */
+  bgPlaylist: { entries: RemoteBg[]; activeId: string | null } | null
+}
+
+/**
+ * A playlist entry as the phone draws it: an image goes through the /img proxy; everything else
+ * is a CSS swatch (videos are never sent to the phone — too heavy for the church Wi-Fi)
+ */
+export interface RemoteBg { id: string; name: string; kind: 'solid' | 'gradient' | 'image' | 'video' | 'animated'; swatch: string; image?: string }
+
+// Colours that stand for the built-in animated backgrounds
+const ANIMATED_SWATCH: Record<string, string> = {
+  'gradient-pulse': 'linear-gradient(135deg,#1e3a8a,#312e81)',
+  aurora:           'linear-gradient(135deg,#0f766e,#4c1d95)',
+  worship:          'linear-gradient(135deg,#78350f,#451a03)',
+  fire:             'linear-gradient(135deg,#b91c1c,#f97316)',
+}
+
+export function remoteBg(e: BgEntry): RemoteBg {
+  const bg = e.background
+  const base = { id: e.id, name: e.name }
+  switch (bg.type) {
+    case 'solid':    return { ...base, kind: 'solid', swatch: bg.color ?? '#000' }
+    case 'gradient': return { ...base, kind: 'gradient', swatch: bg.gradient ?? '#000' }
+    case 'image':    return { ...base, kind: 'image', swatch: '#111827', image: bg.imageUrl?.startsWith('/api/') ? bg.imageUrl : undefined }
+    case 'video':    return { ...base, kind: 'video', swatch: 'linear-gradient(135deg,#1e293b,#0f172a)' }
+    default:         return { ...base, kind: 'animated', swatch: ANIMATED_SWATCH[bg.animated ?? ''] ?? 'linear-gradient(135deg,#334155,#1e1b4b)' }
+  }
 }
 
 export type RemoteCommand =
@@ -47,6 +75,8 @@ export type RemoteCommand =
   | { type: 'media'; file: string }
   /** Operator: Animasi Teks preset (by name, 'none' = off) for the selected item, all its slides */
   | { type: 'textAnim'; preset: string }
+  /** Operator: pick a Background Playlist entry of the selected item (null = back to its default) */
+  | { type: 'bg'; id: string | null }
 
 export const ITEM_KIND: Record<ItemType, string> = {
   song: 'Lagu', scripture: 'Alkitab', announcement: 'Pengumuman', media: 'Media',

@@ -34,15 +34,19 @@ export function ImportSongsModal({ onClose, onImported, onReviewSpelling }: Prop
   const [spellChecking, setSpellChecking] = useState(false)
 
   const pickFiles = (list: FileList | null) => {
-    const picked = Array.from(list ?? []).filter(f => /\.(db|json)$/i.test(f.name))
+    const picked = Array.from(list ?? []).filter(f => /\.(db|json|mb)$/i.test(f.name))
     if (picked.length) { setFiles(picked); setError(''); setStatus('idle'); setResult(null) }
   }
 
   const names     = files.map(f => f.name.toLowerCase())
   const ewSongs   = names.includes('songs.db')
   const ewWords   = names.includes('songwords.db')
-  const ewMissing = ewSongs !== ewWords
-    ? (ewSongs ? 'SongWords.db' : 'Songs.db')
+  const ewMemo    = names.some(n => n.endsWith('.mb'))
+  // EasyWorship 6/7: Songs.db + SongWords.db · EasyWorship 2007/2009: Songs.DB + Songs.MB
+  const ewMissing = ewMemo
+    ? (ewSongs ? null : 'Songs.DB')
+    : ewWords && !ewSongs ? 'Songs.db'
+    : ewSongs && !ewWords ? 'SongWords.db (EasyWorship 6/7) atau Songs.MB (EasyWorship 2009/lama)'
     : null
 
   const handleImport = async () => {
@@ -140,11 +144,30 @@ export function ImportSongsModal({ onClose, onImported, onReviewSpelling }: Prop
             </p>
           </div>
 
+          {/* EasyWorship 2007 / 2009 guide */}
+          <div className="px-3 py-2.5 rounded-xl space-y-1" style={{ background: '#0d1520', border: '1px solid #1e3a5f' }}>
+            <p className="text-[11px] font-semibold" style={{ color: '#ffffff' }}>EasyWorship 2009 / 2007 (versi lama)</p>
+            <p className="text-[10px]" style={{ color: '#94a3b8' }}>
+              Pilih <b style={{ color: '#fbbf24' }}>Songs.DB</b> dan <b style={{ color: '#fbbf24' }}>Songs.MB</b> sekaligus
+              (Ctrl+klik) dari folder <b>Data</b> EasyWorship, biasanya:
+            </p>
+            <code className="block text-[9px] px-2 py-1 rounded break-all" style={{ background: '#0a0f1a', color: '#93c5fd' }}>
+              {'C:\\Users\\Public\\Documents\\Softouch\\EasyWorship\\Default\\Databases\\Data'}
+            </code>
+            <p className="text-[10px]" style={{ color: '#94a3b8' }}>
+              EasyWorship 2007: <span style={{ color: '#93c5fd' }}>C:\Program Files\Softouch\Easyworship\Data</span>
+            </p>
+          </div>
+
           {/* Source info */}
           <div className="text-[10px] space-y-1" style={{ color: '#475569' }}>
             <p>
               <span style={{ color: '#f1f5f9' }}>.db (SQLite)</span>
               {' '}— terdeteksi otomatis: EasyWorship 6/7, OpenLP, ProPresenter 6
+            </p>
+            <p>
+              <span style={{ color: '#f1f5f9' }}>.DB + .MB</span>
+              {' '}— EasyWorship 2009 / 2007 (format Paradox)
             </p>
             <p>
               <span style={{ color: '#f1f5f9' }}>.json</span>
@@ -181,12 +204,12 @@ export function ImportSongsModal({ onClose, onImported, onReviewSpelling }: Prop
                 ) : (
                   <>
                     <p className="text-xs font-medium" style={{ color: '#94a3b8' }}>Klik atau drop file di sini</p>
-                    <p className="text-[10px]" style={{ color: '#64748b' }}>Format: .db · .json — boleh beberapa file</p>
+                    <p className="text-[10px]" style={{ color: '#64748b' }}>Format: .db · .mb · .json — boleh beberapa file</p>
                   </>
                 )}
               </div>
             </div>
-            <input ref={fileRef} type="file" accept=".db,.json" multiple className="hidden"
+            <input ref={fileRef} type="file" accept=".db,.json,.mb" multiple className="hidden"
               onChange={e => { pickFiles(e.target.files); if (fileRef.current) fileRef.current.value = '' }} />
             {ewMissing && (
               <p className="text-[10px] mt-1.5" style={{ color: '#fbbf24' }}>

@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { rtfToText } from '@/lib/rtf'
 import { parseLyrics } from '@/lib/lyrics'
 import { invalidateSpellDict } from '@/lib/spell/spell.server'
+import { readEasyWorshipLegacy, isParadoxDb } from '@/lib/easyworshipLegacy.server'
 
 type SongData = {
   title: string
@@ -27,7 +28,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const jsonFile = files.find(f => f.name.toLowerCase().endsWith('.json'))
-    const songs = jsonFile ? await parseJson(jsonFile) : await parseSqliteDbs(files)
+    const legacy   = jsonFile ? null : await parseLegacyEasyWorship(files)
+    const songs = jsonFile ? await parseJson(jsonFile) : legacy ?? await parseSqliteDbs(files)
 
     if (songs.length === 0) {
       return NextResponse.json(
@@ -52,6 +54,35 @@ async function parseJson(file: File): Promise<SongData[]> {
   const data = JSON.parse(text) as { songs?: SongData[] }
   if (!Array.isArray(data.songs)) throw new Error('Format JSON tidak valid. Harus ada array "songs".')
   return data.songs.filter(s => s.title?.trim())
+}
+
+// ── EasyWorship 2007 / 2009 (Paradox: Songs.DB + Songs.MB) ─────────────────────
+
+/** null when the upload is not an old-EasyWorship database (→ try SQLite) */
+async function parseLegacyEasyWorship(files: File[]): Promise<SongData[] | null> {
+  const mbFile = files.find(f => f.name.toLowerCase().endsWith('.mb'))
+  const paradox: Array<{ file: File; buf: Buffer }> = []
+  for (const f of files.filter(f => f.name.toLowerCase().endsWith('.db'))) {
+    const buf = Buffer.from(await f.arrayBuffer())
+    if (isParadoxDb(buf)) paradox.push({ file: f, buf })
+  }
+  if (!mbFile && !paradox.length) return null
+  if (!mbFile) {
+    throw new Error(`${paradox[0]!.file.name} adalah database EasyWorship lama (2007/2009) — liriknya ada di Songs.MB. Pilih Songs.DB dan Songs.MB bersamaan.`)
+  }
+  // Prefer the .DB with the same base name as the .MB (Songs.DB ↔ Songs.MB)
+  const base = mbFile.name.replace(/\.mb$/i, '').toLowerCase()
+  const dbFile = paradox.find(p => p.file.name.replace(/\.db$/i, '').toLowerCase() === base) ?? paradox[0]
+  if (!dbFile) {
+    throw new Error('Songs.MB hanya berisi lirik — judul lagunya ada di Songs.DB. Pilih Songs.DB dan Songs.MB bersamaan.')
+  }
+
+  const { songs, encoding } = readEasyWorshipLegacy(dbFile.buf, Buffer.from(await mbFile.arrayBuffer()))
+  return songs.map(s => ({
+    title:  s.title,
+    artist: s.author,
+    slides: parseLyrics(rtfToText(s.words, encoding)),
+  })).filter(s => s.title && s.slides.length > 0)
 }
 
 // ── SQLite auto-detect ────────────────────────────────────────────────────────

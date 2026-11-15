@@ -129,7 +129,8 @@ export function TapTempoPanel({
 
       if (next) {
         // Check per-slide jeda (jedaBars × beatsPerSlide = total beats to wait)
-        const jedaBeats = (curr?.jedaBars ?? 0) * beatsPerSlide
+        // Half bars can give half a beat (1.5 bar × 3 beats): the pause ends on a whole beat
+        const jedaBeats = Math.round((curr?.jedaBars ?? 0) * beatsPerSlide)
         if (jedaBeats > 0) {
           inJedaRef.current  = true
           jedaRemRef.current = jedaBeats

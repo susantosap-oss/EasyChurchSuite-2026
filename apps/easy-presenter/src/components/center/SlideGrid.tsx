@@ -8,7 +8,8 @@ import { animGroupKey } from '../types'
 import { groupColor } from '../left/AddSongModal'
 import { ContextMenu, menuPosFrom, type MenuPos, type MenuItem } from '../shared/ContextMenu'
 
-const JEDA_OPTIONS = [1, 2, 4, 8]
+// Pause length in bars (1 bar = the beat/slide setting); half bars for songs that breathe between lines
+const JEDA_OPTIONS = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5]
 /** Smallest card width — readable text on low-res screens; wider screens get more / bigger cards */
 const MIN_CARD_W = 140
 const GAP = 8   // matches gap-2
@@ -166,13 +167,13 @@ export function SlideGrid({
                     </div>
                   ) : isEditingJeda ? (
                     // Inline bar picker
-                    <div className="flex items-center gap-0.5 w-full justify-center">
+                    <div className="flex items-center gap-0.5 w-full justify-center flex-wrap py-0.5">
                       <span className="text-[8px] mr-0.5" style={{ color: '#475569' }}>bar:</span>
                       {JEDA_OPTIONS.map(n => (
                         <button
                           key={n}
                           onClick={() => { onUpdateSlide?.(slide.id, { jedaBars: n }); setJedaEditId(null) }}
-                          className="text-[8px] rounded px-1.5 py-0.5 font-mono"
+                          className="text-[8px] rounded px-1 py-0.5 font-mono"
                           style={{
                             background: slide.jedaBars === n ? '#7c2d12' : '#1e2535',
                             color:      slide.jedaBars === n ? '#fed7aa' : '#94a3b8',

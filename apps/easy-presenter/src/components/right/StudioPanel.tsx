@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Slide } from '../types'
-import type { RunningText } from '@/lib/outputBus'
+import type { RunningText, RunningTextTarget } from '@/lib/outputBus'
 
 interface Props {
   liveSlide?: Slide | null
@@ -16,16 +16,37 @@ const SPEEDS = [
   { label: 'Cepat',  value: 0.22 },
 ] as const
 
+const TARGETS: Array<{ id: RunningTextTarget; label: string; title: string }> = [
+  { id: 'display1', label: 'Display 1', title: 'Hanya Display Out 1' },
+  { id: 'display2', label: 'Display 2', title: 'Hanya Display Out 2' },
+  { id: 'both',     label: 'Keduanya',  title: 'Display Out 1 dan 2' },
+]
+
+// Remembered per PC: it follows how this church wires its outputs (projector / ATEM / stream)
+const TARGET_KEY = 'ec.runningTextTarget'
+function readTarget(): RunningTextTarget {
+  try {
+    const v = localStorage.getItem(TARGET_KEY)
+    return v === 'display1' || v === 'display2' || v === 'both' ? v : 'both'
+  } catch { return 'both' }
+}
+
 export function StudioPanel({ liveSlide, runningText, onRunningText }: Props) {
   // Draft survives tab switches because it starts from what is on air
   const [text, setText]           = useState(runningText?.text ?? '')
   const [direction, setDirection] = useState<RunningText['direction']>(runningText?.direction ?? 'ltr')
   const [speed, setSpeed]         = useState<number>(runningText?.speed ?? SPEEDS[1].value)
+  const [target, setTarget]       = useState<RunningTextTarget>(() => runningText?.target ?? readTarget())
   const isOnAir = runningText != null
 
   const push = (patch: Partial<RunningText> = {}) => {
-    const next = { text: text.trim(), direction, speed, ...patch }
+    const next = { text: text.trim(), direction, speed, target, ...patch }
     if (next.text) onRunningText(next)
+  }
+  const changeTarget = (t: RunningTextTarget) => {
+    setTarget(t)
+    try { localStorage.setItem(TARGET_KEY, t) } catch { /* session only */ }
+    if (isOnAir) push({ target: t })
   }
   // Direction / speed changes apply straight away while the ticker is on air
   const changeDirection = (d: RunningText['direction']) => { setDirection(d); if (isOnAir) push({ direction: d }) }
@@ -56,21 +77,6 @@ export function StudioPanel({ liveSlide, runningText, onRunningText }: Props) {
             </div>
           </div>
         </div>
-
-        {/* Screen selector */}
-        <div
-          className="flex items-center justify-between px-3 py-2 rounded-lg mt-2"
-          style={{ background: '#1e2535', border: '1px solid #2a3347' }}
-        >
-          <span className="text-[10px]" style={{ color: '#64748b' }}>Output Screen</span>
-          <select
-            className="bg-transparent text-[10px] focus:outline-none"
-            style={{ color: '#94a3b8' }}
-          >
-            <option>Display 1 (Primary)</option>
-            <option>Display 2 (Proyektor)</option>
-          </select>
-        </div>
       </div>
 
       <div className="mx-3 my-1" style={{ height: '1px', background: '#2a3347' }} />
@@ -92,6 +98,21 @@ export function StudioPanel({ liveSlide, runningText, onRunningText }: Props) {
             placeholder="Selamat datang di ibadah raya · Persekutuan Pemuda Sabtu pkl 17.00"
             className="w-full px-2.5 py-1.5 rounded-lg text-xs focus:outline-none resize-none"
             style={{ background: '#1e2535', border: '1px solid #2a3347', color: '#e2e8f0' }} />
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] w-12" style={{ color: '#475569' }}>Tampil di</span>
+            {TARGETS.map(t => (
+              <button key={t.id} onClick={() => changeTarget(t.id)} title={t.title}
+                className="flex-1 py-1 rounded text-[10px] font-medium"
+                style={{
+                  background: target === t.id ? '#1d4ed8' : '#1e2535',
+                  color:      target === t.id ? 'white' : '#94a3b8',
+                  border:     '1px solid #2a3347',
+                }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
 
           <div className="flex items-center gap-2">
             <span className="text-[10px] w-12" style={{ color: '#475569' }}>Arah</span>

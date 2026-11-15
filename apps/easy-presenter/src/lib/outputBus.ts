@@ -11,6 +11,20 @@ export interface RunningText {
   direction: 'ltr' | 'rtl'
   /** Frame widths per second */
   speed: number
+  /**
+   * Which outputs show the ticker (missing = both). E.g. only the projector output when the
+   * other output feeds a stream that must stay clean.
+   */
+  target?: RunningTextTarget
+}
+
+export type RunningTextTarget = 'both' | 'display1' | 'display2'
+
+/** Does output N show the running text? */
+export function runningTextOn(rt: RunningText | null | undefined, display: 1 | 2): boolean {
+  if (!rt) return false
+  const t = rt.target ?? 'both'
+  return t === 'both' || t === `display${display}`
 }
 
 export interface OutputState {

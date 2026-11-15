@@ -4,7 +4,7 @@ import { SlideCanvas } from '../shared/SlideCanvas'
 import type { Slide, SlideBackground, TextStyle, MediaControl, MediaStatus } from '../types'
 import { OutputVideo } from './OutputVideo'
 import { RunningTextOverlay } from '../shared/RunningTextOverlay'
-import type { RunningText } from '@/lib/outputBus'
+import { runningTextOn, type RunningText } from '@/lib/outputBus'
 
 /** Inner width of the 16:9 preview (300px panel − padding − border) */
 const PREVIEW_W = 276
@@ -89,7 +89,14 @@ export function OutputPanel({
                 <span className="text-[10px]" style={{ color: '#1f2937' }}>Belum ada output</span>
               </div>
             )}
-            {runningText && <RunningTextOverlay runningText={runningText} width={PREVIEW_W} />}
+            {/* This preview is Display 1 — a Display-2-only ticker is just flagged */}
+            {runningText && runningTextOn(runningText, 1) && <RunningTextOverlay runningText={runningText} width={PREVIEW_W} />}
+            {runningText && !runningTextOn(runningText, 1) && (
+              <div className="absolute bottom-1 left-1 text-[8px] px-1.5 py-0.5 rounded font-semibold"
+                style={{ background: 'rgba(0,0,0,0.7)', color: '#fbbf24', zIndex: 10 }}>
+                Running text → Display 2
+              </div>
+            )}
           </div>
 
           {/* Live dot indicator */}

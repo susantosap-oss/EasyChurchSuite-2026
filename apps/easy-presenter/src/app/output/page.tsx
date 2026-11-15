@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { SlideCanvas } from '@/components/shared/SlideCanvas'
 import { textSettingsToStyle, chromaApplies } from '@/components/settings/appSettings'
 import { RunningTextOverlay } from '@/components/shared/RunningTextOverlay'
-import { openOutputChannel, type OutputMessage, type OutputState } from '@/lib/outputBus'
+import { openOutputChannel, runningTextOn, type OutputMessage, type OutputState } from '@/lib/outputBus'
 import { setLowSpec } from '@/lib/perfMode'
 import type { SlideBackground, TextStyle } from '@/components/types'
 
@@ -101,7 +101,9 @@ export default function OutputPage() {
           ) : null
         )}
 
-        {state?.runningText && <RunningTextOverlay runningText={state.runningText} width={boxW} />}
+        {state?.runningText && runningTextOn(state.runningText, display) && (
+          <RunningTextOverlay runningText={state.runningText} width={boxW} />
+        )}
       </div>
     </div>
   )

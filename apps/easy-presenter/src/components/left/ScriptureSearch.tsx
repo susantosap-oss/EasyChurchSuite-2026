@@ -33,6 +33,10 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
   const [loading, setLoading]             = useState(false)
   const [dbMissing, setDbMissing]         = useState(false)
   const [selectedVerseIdx, setSelectedVerseIdx] = useState(0)
+  const [refError, setRefError]           = useState('')
+  const [jumping, setJumping]             = useState(false)
+  /** Verse to select once the chapter has loaded (typed reference: Yoh 3:16) */
+  const pendingVerseRef = useRef<number | null>(null)
   const verseListRef = useRef<HTMLDivElement>(null)
   const verseRowRefs = useRef<(HTMLDivElement | null)[]>([])
 
@@ -82,6 +86,82 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
     setSelectedVerseIdx(0)
     verseRowRefs.current = []
   }, [view, selectedChapter, version])
+
+  // Typed reference: select (and scroll to) the requested verse once the chapter is loaded
+  useEffect(() => {
+    const want = pendingVerseRef.current
+    if (want == null || loading || !verses.length) return
+    pendingVerseRef.current = null
+    const idx = Math.max(0, verses.findIndex(v => v.verseNumber === want))
+    setSelectedVerseIdx(idx)
+    requestAnimationFrame(() => verseRowRefs.current[idx]?.scrollIntoView({ block: 'center' }))
+  }, [verses, loading])
+
+  /**
+   * Enter in a search box: "Yoh 3:16" / "Yoh 3" / "1 Kor 13 4" / "John 3.16" opens that chapter
+   * and selects the verse (Enter again = Live). A plain book name opens its chapter list.
+   */
+  const jumpToReference = async (raw: string) => {
+    const text = raw.trim()
+    setRefError('')
+    if (!text) return
+    // Normalise "Yoh 3 16" and "Yoh 3.16" to "Yoh 3:16"
+    const norm = text
+      .replace(/(\d)\s*[.,]\s*(\d)/, '$1:$2')
+      .replace(/^(.*\D)\s+(\d+)\s+(\d+)$/, '$1 $2:$3')
+      .replace(/\s*:\s*/, ':')
+      .replace(/^(\d)\s*(?=[a-z])/i, '$1 ')   // "1Kor" and "1 Kor" both work
+      .replace(/([a-z])(\d)/i, '$1 $2')        // "Yoh3:16" → "Yoh 3:16"
+
+    if (!/\d\s*$/.test(norm) || /^\d+$/.test(norm.replace(/\s/g, ''))) {
+      // No chapter number → book name: open the first matching book
+      const lower = text.toLowerCase()
+      const book = books.find(b => b.nameAbbr.toLowerCase() === lower || b.name.toLowerCase() === lower)
+        ?? books.find(b => b.name.toLowerCase().includes(lower) || b.nameAbbr.toLowerCase().includes(lower))
+      if (book) { setSelectedBook(book); setView('chapters'); setQ('') }
+      else setRefError('Kitab tidak ditemukan')
+      return
+    }
+
+    setJumping(true)
+    try {
+      const res  = await fetch(`/api/quick-search/?q=${encodeURIComponent(norm)}&v=${encodeURIComponent(version)}`)
+      const data = await res.json() as {
+        found?: boolean; error?: string
+        ref?: { bookNumber: number; chapter: number; verse?: number }
+      }
+      const book = data.ref ? books.find(b => b.number === data.ref!.bookNumber) : undefined
+      if (!data.found || !data.ref || !book) { setRefError(data.error ?? 'Ayat tidak ditemukan'); return }
+      pendingVerseRef.current = data.ref.verse ?? 1
+      setSelectedBook(book)
+      setSelectedChapter(data.ref.chapter)
+      setView('verses')
+      setQ('')
+      // Leave the text box so ↑↓ / Enter work on the verse list right away
+      ;(document.activeElement as HTMLElement | null)?.blur()
+    } catch {
+      setRefError('Gagal mencari ayat')
+    } finally {
+      setJumping(false)
+    }
+  }
+
+  /** Compact "go to verse" box for the chapter / verse views */
+  const refJumpBox = (
+    <div>
+      <input
+        placeholder="Ketik ayat lalu Enter, mis. Yoh 3:16"
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); jumpToReference(e.currentTarget.value); e.currentTarget.value = '' }
+          if (e.key === 'Escape') e.currentTarget.blur()
+        }}
+        onChange={() => refError && setRefError('')}
+        className="w-full px-2 py-1 rounded text-[11px] focus:outline-none"
+        style={{ background: '#1e2535', border: `1px solid ${refError ? '#7f1d1d' : '#2a3347'}`, color: '#e2e8f0' }}
+      />
+      {refError && <p className="text-[9px] mt-0.5" style={{ color: '#f87171' }}>{refError}</p>}
+    </div>
+  )
 
   // Keyboard navigation in verse view
   useEffect(() => {
@@ -188,10 +268,16 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <input value={q} onChange={e => setQ(e.target.value)}
-                placeholder="Cari kitab..."
+              <input value={q} onChange={e => { setQ(e.target.value); if (refError) setRefError('') }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); jumpToReference(q) }
+                  if (e.key === 'Escape') { setQ(''); setRefError('') }
+                }}
+                placeholder="Cari kitab / ketik Yoh 3:16 ↵"
+                title="Ketik nama kitab, atau referensi (Yoh 3:16, Mzm 23, 1Kor 13:4) lalu Enter"
                 className="bg-transparent text-xs focus:outline-none w-full"
                 style={{ color: '#e2e8f0' }} />
+              {jumping && <span className="text-[9px] flex-shrink-0" style={{ color: '#64748b' }}>…</span>}
               {q && (
                 <button onClick={() => setQ('')}
                   className="text-slate-500 hover:text-slate-300 text-xs leading-none flex-shrink-0">×</button>
@@ -207,6 +293,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
             </button>
           </div>
           {versionPills}
+          {refError && <p className="text-[9px]" style={{ color: '#f87171' }}>{refError}</p>}
         </div>
 
         {showImport && <ImportBibleModal onClose={() => setShowImport(false)} />}
@@ -278,6 +365,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
           <p className="text-[10px]" style={{ color: '#374151' }}>
             {count} pasal — pilih pasal untuk lihat ayat
           </p>
+          {refJumpBox}
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
@@ -330,6 +418,7 @@ export function ScriptureSearch({ onAdd, onQuickLaunch }: Props) {
               Klik 2× / Enter / Ctrl+L = Live ayat ini · ↑↓ = Live langsung
             </p>
           )}
+          {refJumpBox}
         </div>
 
         <div ref={verseListRef} className="flex-1 overflow-y-auto">

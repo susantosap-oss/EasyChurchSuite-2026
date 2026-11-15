@@ -84,6 +84,8 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
 .zoom{display:flex;gap:6px}
 .main{flex:1;display:flex;flex-direction:column;min-height:0}
 .colA,.colB{display:flex;flex-direction:column;min-height:0}
+/* never squash the monitor / buttons when the column is short — it scrolls instead */
+.colA>*{flex-shrink:0}
 .colB{flex:1}
 .prev img{display:none;width:100%;max-height:160px;object-fit:contain;border-radius:6px;background:#000}
 .prev.pic img{display:block}.prev.pic p{display:none}
@@ -101,7 +103,11 @@ button{font:inherit;color:inherit;border:0;cursor:pointer}
   .colB{width:52%}
   .prev{min-height:0;margin:8px}.prev p{-webkit-line-clamp:4;font-size:14px}
   .row{margin:0 8px 6px}.btn{padding:11px 6px;font-size:15px}.btn.big{padding:14px 6px;font-size:17px}
-  .anim{margin:0 8px 6px}.ach button{padding:7px 10px}
+  .prev{min-height:72px}
+  /* one swipeable row of smaller chips, so monitor + buttons + presets fit a phone's height */
+  .anim{margin:0 8px 6px}.anim small{margin:0 2px 4px;font-size:10px}
+  .ach{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.ach::-webkit-scrollbar{display:none}
+  .ach button{flex-shrink:0;padding:6px 10px;font-size:12px}
   .tabs{margin:8px 8px 0}.list{margin:0 8px 8px}
   .mon{margin:8px}.speak .colA{width:58%}.speak .colB{width:42%}
   .pvw{margin:8px 8px 0;grid-template-columns:1fr}.pvw .info{display:none}

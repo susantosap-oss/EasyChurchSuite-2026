@@ -5,6 +5,7 @@ import { execFile, spawn, type ChildProcess } from 'child_process'
 import http from 'http'
 import net from 'net'
 import { RemoteServer } from './remote'
+import { listSerialPorts, sendMatrix, type MatrixSendRequest } from './matrix'
 
 // One running instance only — a second copy would start a second server on the same data
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -312,6 +313,11 @@ ipcMain.handle('settings:apply-native', (_event, s: NativeSettings) => {
   try { writeFileSync(SETTINGS_FILE, JSON.stringify(native, null, 2)) } catch { /* read-only profile */ }
   applyOutputs(native)
 })
+
+// ── HDMI matrix (Wall mode) over RS-232 ──
+
+ipcMain.handle('matrix:list-ports', () => listSerialPorts())
+ipcMain.handle('matrix:send', (_event, req: MatrixSendRequest) => sendMatrix(req))
 
 ipcMain.handle('app:gpu-info', () => app.getGPUFeatureStatus() as unknown as Record<string, string>)
 

@@ -25,6 +25,12 @@ declare global {
     /** GPU feature status from Chromium */
     getGpuInfo?: () => Promise<Record<string, string>>
     relaunch?: () => void
+    /** COM ports with Device Manager names (HDMI matrix control) */
+    matrixListPorts?: () => Promise<{ port: string; name: string }[]>
+    /** Send RS-232 commands to the HDMI matrix; replies are printable text with \xNN escapes */
+    matrixSend?: (req: {
+      port: string; baud: number; commands: string[]; lineEnding: 'none' | 'cr' | 'lf' | 'crlf'; gapMs?: number
+    }) => Promise<{ ok: boolean; error?: string; replies: string[] }>
     /** Phone remote: push the operator snapshot (JSON) to connected phones */
     remoteSendState?: (json: string) => void
     remoteInfo?: () => Promise<RemoteInfo | null>

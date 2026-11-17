@@ -23,9 +23,11 @@ interface Props {
   onOpenRemote: () => void
   /** Phones connected to the remote */
   remoteCount: number
+  /** Wall mode button — hidden when matrix control is off */
+  wall: { visible: boolean; on: boolean; busy: boolean; onToggle: () => void }
 }
 
-export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLaunch, onGotoItem, onOpenSettings, onOpenRemote, remoteCount }: Props) {
+export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLaunch, onGotoItem, onOpenSettings, onOpenRemote, remoteCount, wall }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<QuickResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -191,6 +193,21 @@ export function TopBar({ isLive, isBlank, onGoLive, onBlank, service, onQuickLau
       </div>
 
       <div className="flex-1" />
+
+      {/* Wall mode: side TVs show the wings (switches the HDMI matrix) */}
+      {wall.visible && (
+        <button onClick={wall.onToggle} disabled={wall.busy}
+          title={wall.on ? 'Wall ON — TV samping menampilkan sayap kiri / kanan. Klik untuk OFF.' : 'Wall OFF — klik untuk menyalakan Wall'}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style={{
+            background: wall.on ? '#047857' : '#1e2535',
+            color:      wall.on ? '#ecfdf5' : '#94a3b8',
+            border:     `1px solid ${wall.on ? '#059669' : '#2a3347'}`,
+            opacity:    wall.busy ? 0.6 : 1,
+          }}>
+          {wall.busy ? '🧱 …' : wall.on ? '🧱 WALL ON' : '🧱 Wall'}
+        </button>
+      )}
 
       {/* Phone remote */}
       <button onClick={onOpenRemote} title="Remote HP (Operator / Speaker)"

@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   applyNativeSettings: (s: unknown) => ipcRenderer.invoke('settings:apply-native', s),
   getGpuInfo: () => ipcRenderer.invoke('app:gpu-info'),
   relaunch: () => ipcRenderer.send('app:relaunch'),
+  // HDMI matrix (Wall mode)
+  matrixListPorts: () => ipcRenderer.invoke('matrix:list-ports'),
+  matrixSend: (req: unknown) => ipcRenderer.invoke('matrix:send', req),
   // Phone remote
   remoteSendState: (json: string) => ipcRenderer.send('remote:state', json),
   remoteInfo: () => ipcRenderer.invoke('remote:info'),

@@ -8,11 +8,13 @@ import type { SlideBackground } from '../types'
 import type { SceneRef } from '../left/SaveSceneModal'
 import {
   ANIMATION_PRESETS, presetNameOf, textSettingsToStyle, defaultTextStyle,
-  type AppSettings, type DisplaySettings, type DisplayTextSettings, type TextPosition,
+  MATRIX_TEMPLATES, matrixCommands, describeRoutes,
+  type AppSettings, type MatrixSettings, type MatrixRoute, type DisplaySettings, type DisplayTextSettings, type TextPosition,
 } from './appSettings'
 import { DEFAULT_TEXT_STYLE } from '../types'
+import { sendMatrixCommands } from '@/lib/matrix'
 
-type Tab = 'teks' | 'background' | 'animasi' | 'scene' | 'output' | 'performa'
+type Tab = 'teks' | 'background' | 'animasi' | 'scene' | 'output' | 'wall' | 'performa'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'teks',       label: '🔤 Teks' },
@@ -20,6 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'animasi',    label: '✨ Animasi' },
   { id: 'scene',      label: '📋 Scene' },
   { id: 'output',     label: '🖥 Output' },
+  { id: 'wall',       label: '🧱 Wall / Matrix' },
   { id: 'performa',   label: '⚡ Performa' },
 ]
 
@@ -158,6 +161,7 @@ export function SettingsModal({ settings, bgLibrary, currentScene, onSave, onCre
             {tab === 'animasi' && <AnimationTab draft={draft} setDraft={setDraft} />}
             {tab === 'scene' && <SceneTab currentScene={currentScene} onCreateScene={onCreateScene} onDone={onClose} />}
             {tab === 'output' && <OutputTab draft={draft} setDraft={setDraft} />}
+            {tab === 'wall' && <WallTab draft={draft} setDraft={setDraft} />}
             {tab === 'performa' && <PerformanceTab draft={draft} setDraft={setDraft} saved={settings} />}
           </div>
         </div>
@@ -516,7 +520,194 @@ function OutputTab({ draft, setDraft }: { draft: AppSettings; setDraft: React.Di
   )
 }
 
-// ── 6. Performa ──
+// ── 6. Wall / Matrix ──
+
+const INPUT_STYLE = { background: '#1e2535', border: `1px solid ${C.border}`, color: '#e2e8f0' }
+
+function RouteRows({ routes, onChange }: { routes: MatrixRoute[]; onChange: (r: MatrixRoute[]) => void }) {
+  const set = (i: number, patch: Partial<MatrixRoute>) => onChange(routes.map((r, j) => j === i ? { ...r, ...patch } : r))
+  const nums = [1, 2, 3, 4]
+  return (
+    <div className="space-y-1">
+      {routes.map((r, i) => (
+        <div key={i} className="flex items-center gap-1.5 text-[12px]" style={{ color: '#e2e8f0' }}>
+          OUT
+          <select value={r.out} onChange={e => set(i, { out: Number(e.target.value) })}
+            className="px-1.5 py-0.5 rounded focus:outline-none" style={INPUT_STYLE}>
+            {nums.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          ← IN
+          <select value={r.in} onChange={e => set(i, { in: Number(e.target.value) })}
+            className="px-1.5 py-0.5 rounded focus:outline-none" style={INPUT_STYLE}>
+            {nums.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <button onClick={() => onChange(routes.filter((_, j) => j !== i))} className="ml-1 text-[11px]" style={{ color: C.dim }}>✕</button>
+        </div>
+      ))}
+      {routes.length < 4 && (
+        <button onClick={() => onChange([...routes, { out: 1, in: 1 }])} className="text-[11px]" style={{ color: '#60a5fa' }}>
+          + Tambah jalur
+        </button>
+      )}
+    </div>
+  )
+}
+
+function WallTab({ draft, setDraft }: { draft: AppSettings; setDraft: React.Dispatch<React.SetStateAction<AppSettings>> }) {
+  const m = draft.wall.matrix
+  const set = (patch: Partial<MatrixSettings>) =>
+    setDraft(d => ({ ...d, wall: { ...d.wall, matrix: { ...d.wall.matrix, ...patch } } }))
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.matrixSend
+
+  const [ports, setPorts] = useState<{ port: string; name: string }[] | null>(null)
+  const [busy, setBusy]   = useState(false)
+  const [raw, setRaw]     = useState('')
+  const [log, setLog]     = useState<{ sent: string; reply: string; error?: string }[]>([])
+
+  const refreshPorts = () => {
+    setPorts(null)
+    window.electronAPI?.matrixListPorts?.().then(setPorts).catch(() => setPorts([]))
+  }
+  useEffect(() => { if (m.control === 'serial') refreshPorts() }, [m.control])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const send = async (commands: string[]) => {
+    setBusy(true)
+    try {
+      const r = await sendMatrixCommands(m, commands)
+      const rows = r.ok ? r.log : commands.map(sent => ({ sent, reply: '', error: r.message }))
+      setLog(l => [...rows, ...l].slice(0, 30))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const portMissing = ports !== null && m.port !== '' && !ports.some(p => p.port === m.port)
+
+  return (
+    <>
+      <Section title="Kontrol Matrix HDMI"
+        note="Saat Wall ON, TV kiri / kanan menampilkan sayap kiri / kanan dari PC; saat OFF kembali ke feed biasa. Tombol Wall muncul di bar atas bila kontrol tidak Off.">
+        <Seg value={m.control} onChange={v => set({ control: v })}
+          options={[{ id: 'off', label: 'Off (tanpa Wall)' }, { id: 'manual', label: 'Manual (pengingat)' }, { id: 'serial', label: 'RS-232 (otomatis)' }]} />
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div>
+            <p className="text-[10px] mb-1" style={{ color: C.muted }}>Wall ON</p>
+            <RouteRows routes={m.wallOn} onChange={r => set({ wallOn: r })} />
+          </div>
+          <div>
+            <p className="text-[10px] mb-1" style={{ color: C.muted }}>Wall OFF</p>
+            <RouteRows routes={m.wallOff} onChange={r => set({ wallOff: r })} />
+          </div>
+        </div>
+        {m.control === 'manual' && (
+          <p className="text-[10px]" style={{ color: C.dim }}>
+            Mode manual: saat tombol Wall ditekan, operator diingatkan menekan tombol OUT lalu IN di depan matrix.
+          </p>
+        )}
+      </Section>
+
+      {m.control === 'serial' && (
+        <>
+          <Section title="Koneksi RS-232"
+            note="Kabel USB-to-RS232 (DB9 jantan) ke port CONSOLE di belakang matrix. Bila matrix tidak membalas sama sekali, coba adaptor null-modem.">
+            {!isElectron && <p className="text-[11px]" style={{ color: '#fca5a5' }}>Hanya tersedia di aplikasi desktop.</p>}
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <p className="text-[10px] mb-1" style={{ color: C.muted }}>Port COM {ports === null && isElectron ? '(mencari…)' : ''}</p>
+                <select value={m.port} onChange={e => set({ port: e.target.value })}
+                  className="w-full px-2.5 py-1.5 rounded-lg text-[12px] focus:outline-none" style={INPUT_STYLE}>
+                  <option value="">— pilih port —</option>
+                  {portMissing && <option value={m.port}>{m.port} (tidak terdeteksi)</option>}
+                  {(ports ?? []).map(p => <option key={p.port} value={p.port}>{p.name}</option>)}
+                </select>
+              </div>
+              <button onClick={refreshPorts} className="px-3 py-1.5 rounded-lg text-[12px]" style={INPUT_STYLE}>↻ Cari ulang</button>
+            </div>
+            {ports !== null && ports.length === 0 && (
+              <p className="text-[10px]" style={{ color: '#fca5a5' }}>
+                Tidak ada port COM. Colok kabel USB-RS232 lalu Cari ulang; bila tetap kosong, pasang driver kabelnya (Prolific / FTDI / CH340).
+              </p>
+            )}
+            <div>
+              <p className="text-[10px] mb-1" style={{ color: C.muted }}>Baud rate (8 data bit, tanpa parity, 1 stop bit)</p>
+              <Seg value={m.baud} onChange={v => set({ baud: v })}
+                options={[9600, 19200, 38400, 57600, 115200].map(b => ({ id: b, label: String(b) }))} />
+            </div>
+            <div>
+              <p className="text-[10px] mb-1" style={{ color: C.muted }}>Akhiran tiap perintah</p>
+              <Seg value={m.lineEnding} onChange={v => set({ lineEnding: v })}
+                options={[{ id: 'none', label: 'Tidak ada' }, { id: 'cr', label: 'CR' }, { id: 'lf', label: 'LF' }, { id: 'crlf', label: 'CR+LF' }]} />
+            </div>
+          </Section>
+
+          <Section title="Format perintah"
+            note={'Satu perintah per jalur. {in} {out} = 1…4, {in2} {out2} = 01…04. Escape: \\r \\n \\xNN. MT-VIKI: 2B3. (tanpa akhiran). Bila tidak bereaksi, coba SW I2 O3 + CR+LF, lalu Test sampai LCD matrix berpindah.'}>
+            <input value={m.template} onChange={e => set({ template: e.target.value })} spellCheck={false}
+              className="w-full px-2.5 py-1.5 rounded-lg text-[12px] font-mono focus:outline-none" style={INPUT_STYLE} />
+            <div className="flex gap-1 flex-wrap">
+              {MATRIX_TEMPLATES.map(t => (
+                <button key={t.template} onClick={() => set({ template: t.template, lineEnding: t.lineEnding })}
+                  className="text-[11px] px-2 py-0.5 rounded-lg font-mono"
+                  style={{ background: m.template === t.template ? '#1d4ed8' : '#1e2535', color: '#fff', border: `1px solid ${C.border}` }}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="text-[11px] font-mono space-y-0.5" style={{ color: C.muted }}>
+              <div>ON : {matrixCommands(m, m.wallOn).join('  ·  ') || '—'}</div>
+              <div>OFF: {matrixCommands(m, m.wallOff).join('  ·  ') || '—'}</div>
+            </div>
+            <div className="flex gap-2">
+              <button disabled={busy || !isElectron} onClick={() => send(matrixCommands(m, m.wallOn))}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold" style={{ background: '#15803d', color: '#fff', opacity: busy ? 0.6 : 1 }}>
+                ▶ Test Wall ON
+              </button>
+              <button disabled={busy || !isElectron} onClick={() => send(matrixCommands(m, m.wallOff))}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold" style={{ background: '#334155', color: '#fff', opacity: busy ? 0.6 : 1 }}>
+                ■ Test Wall OFF
+              </button>
+              <span className="text-[10px] self-center" style={{ color: C.dim }}>
+                Cek LCD matrix: {describeRoutes(m.wallOn)}
+              </span>
+            </div>
+          </Section>
+
+          <Section title="Kirim perintah manual" note="Untuk mencoba format lain. Balasan matrix tampil di bawah (karakter non-teks sebagai \xNN).">
+            <div className="flex gap-2">
+              <input value={raw} onChange={e => setRaw(e.target.value)} spellCheck={false}
+                onKeyDown={e => { if (e.key === 'Enter' && raw.trim() && !busy) send([raw]) }}
+                placeholder="mis. LINK:O3I2;END" className="flex-1 px-2.5 py-1.5 rounded-lg text-[12px] font-mono focus:outline-none" style={INPUT_STYLE} />
+              <button disabled={busy || !raw.trim() || !isElectron} onClick={() => send([raw])}
+                className="px-3 py-1.5 rounded-lg text-[12px] font-semibold" style={{ background: '#1d4ed8', color: '#fff', opacity: busy ? 0.6 : 1 }}>
+                {busy ? 'Mengirim…' : 'Kirim'}
+              </button>
+            </div>
+            <div className="flex gap-1 flex-wrap items-center">
+              <span className="text-[10px]" style={{ color: C.dim }}>Cek status:</span>
+              {['Status.', 'STATUS\\r\\n', 'BeepOff.'].map(c => (
+                <button key={c} disabled={busy || !isElectron} onClick={() => send([c])}
+                  className="text-[11px] px-2 py-0.5 rounded-lg font-mono" style={{ background: '#1e2535', color: '#fff', border: `1px solid ${C.border}` }}>
+                  {c}
+                </button>
+              ))}
+            </div>
+            <div className="rounded-lg p-2 text-[11px] font-mono max-h-40 overflow-y-auto space-y-0.5" style={{ background: C.panel }}>
+              {log.length === 0 ? <span style={{ color: C.dim }}>Belum ada perintah terkirim</span> : log.map((l, i) => (
+                <div key={i}>
+                  <span style={{ color: '#93c5fd' }}>→ {l.sent}</span>
+                  {l.error ? <span style={{ color: '#fca5a5' }}>  ✕ {l.error}</span>
+                    : <span style={{ color: l.reply ? '#86efac' : C.dim }}>  ← {l.reply || '(tidak ada balasan)'}</span>}
+                </div>
+              ))}
+            </div>
+          </Section>
+        </>
+      )}
+    </>
+  )
+}
+
+// ── 7. Performa ──
 
 function PerformanceTab({ draft, setDraft, saved }: {
   draft: AppSettings; setDraft: React.Dispatch<React.SetStateAction<AppSettings>>; saved: AppSettings

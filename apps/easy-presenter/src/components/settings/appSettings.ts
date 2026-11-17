@@ -82,6 +82,54 @@ export interface VideoLimits {
   keepOriginal: boolean
 }
 
+/**
+ * Wall mode: the two side TVs show the wings of a canvas that spans the videotron.
+ * The HDMI matrix switches the TV outputs between the wings (Wall ON) and the normal feed (OFF).
+ */
+export type MatrixControl = 'off' | 'manual' | 'serial'
+export type LineEnding = 'none' | 'cr' | 'lf' | 'crlf'
+
+/** One matrix route: output `out` shows input `in` (1-based, as printed on the matrix) */
+export interface MatrixRoute { out: number; in: number }
+
+export interface MatrixSettings {
+  /** off = no Wall button; manual = remind the operator which buttons to press; serial = RS-232 */
+  control: MatrixControl
+  port: string                  // COM3 …
+  baud: number
+  lineEnding: LineEnding
+  /** Pause after each command, ms */
+  gapMs: number
+  /** One command per route; {in} {out} = 1…4, {in2} {out2} = 01…04 */
+  template: string
+  wallOn: MatrixRoute[]
+  wallOff: MatrixRoute[]
+}
+
+/** Known command formats of cheap 4×4 HDMI matrices — offered as "try this" buttons */
+export const MATRIX_TEMPLATES: { label: string; template: string; lineEnding: LineEnding }[] = [
+  { label: '2B3. (MT-VIKI)',  template: '{in}B{out}.',           lineEnding: 'none' },
+  { label: 'SW I2 O3 + CRLF', template: 'SW I{in} O{out}',       lineEnding: 'crlf' },
+  { label: 'LINK:O3I2;END',   template: 'LINK:O{out}I{in};END',  lineEnding: 'none' },
+  { label: '2V3.',            template: '{in}V{out}.',           lineEnding: 'none' },
+  { label: 's in 2 av out 3!', template: 's in {in} av out {out}!', lineEnding: 'none' },
+  { label: 'MT00SW0203NT',    template: 'MT00SW{in2}{out2}NT',   lineEnding: 'none' },
+  { label: 'SET SW in2 out3', template: 'SET SW in{in} out{out}', lineEnding: 'crlf' },
+]
+
+/** Commands for a set of routes */
+export function matrixCommands(m: MatrixSettings, routes: MatrixRoute[]): string[] {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return routes.map(r => m.template
+    .replace(/\{in2\}/g, pad(r.in)).replace(/\{out2\}/g, pad(r.out))
+    .replace(/\{in\}/g, String(r.in)).replace(/\{out\}/g, String(r.out)))
+}
+
+/** "OUT3 ← IN2, OUT4 ← IN3" */
+export function describeRoutes(routes: MatrixRoute[]): string {
+  return routes.map(r => `OUT${r.out} ← IN${r.in}`).join(', ')
+}
+
 export interface AppSettings {
   display1: DisplaySettings
   display2: DisplaySettings
@@ -104,6 +152,7 @@ export interface AppSettings {
   }
   /** Reserved — NDI output is not implemented yet (needs the NDI SDK native addon) */
   ndi: { enabled: boolean; sourceName: string }
+  wall: { matrix: MatrixSettings }
 }
 
 const DEFAULT_TEXT: DisplayTextSettings = {
@@ -133,6 +182,17 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     video: { autoConvert: true, maxHeight: 1080, maxBitrateKbps: 12000, maxFps: 30, keepOriginal: false },
   },
   ndi: { enabled: false, sourceName: 'EasyChurch Suite' },
+  // Church: MT-VIKI MT-HD414. IN1 = ATEM, IN2 / IN3 = left / right wing from the PC, OUT3 / OUT4 = side TVs.
+  // MT-VIKI ASCII format "<in>B<out>." (e.g. 2B3.) from the user's reference — not yet tested on the unit;
+  // OEM boards may want "SW I<in> O<out>\r\n" instead (preset in Settings).
+  wall: {
+    matrix: {
+      control: 'off', port: '', baud: 9600, lineEnding: 'none', gapMs: 300,
+      template: '{in}B{out}.',
+      wallOn:  [{ out: 3, in: 2 }, { out: 4, in: 3 }],
+      wallOff: [{ out: 3, in: 1 }, { out: 4, in: 1 }],
+    },
+  },
 }
 
 /** Fill gaps from older saved JSON with defaults (one level deep per section) */
@@ -153,6 +213,7 @@ export function normalizeSettings(raw: Partial<AppSettings> | null | undefined):
     },
     performance: { ...d.performance, ...r.performance, video: { ...d.performance.video, ...r.performance?.video } },
     ndi: { ...d.ndi, ...r.ndi },
+    wall: { ...d.wall, ...r.wall, matrix: { ...d.wall.matrix, ...r.wall?.matrix } },
   }
 }
 

@@ -16,6 +16,7 @@ import { useBgLibrary } from './center/BackgroundPanels'
 import { useAppSettings } from './settings/useAppSettings'
 import { applyAppDefaults, defaultTextStyle, chromaColor, chromaApplies } from './settings/appSettings'
 import { SettingsModal } from './settings/SettingsModal'
+import { switchWall } from '@/lib/matrix'
 import { openOutputChannel, type OutputMessage, type OutputState, type RunningText } from '@/lib/outputBus'
 import type { ServiceItem, SlideBackground, TextStyle, Slide } from './types'
 import { DEFAULT_TEXT_STYLE, DEFAULT_SONG_BG, DEFAULT_SCRIPTURE_BG, resolveTextStyle, pickedBackground, withUniqueSlideIds, songIdOf } from './types'
@@ -88,6 +89,15 @@ export function UnifiedLayout() {
     return () => clearTimeout(t)
   }, [ui.changedAt])
   const [currentScene, setCurrentScene]   = useState<SceneRef | null>(null)
+  // Wall mode — the matrix state is not read back, so the app starts assuming OFF
+  const [wallOn, setWallOn]               = useState(false)
+  const [wallBusy, setWallBusy]           = useState(false)
+  const [wallMsg, setWallMsg]             = useState<{ ok: boolean; text: string; sticky: boolean } | null>(null)
+  useEffect(() => {
+    if (!wallMsg || wallMsg.sticky) return
+    const t = setTimeout(() => setWallMsg(null), 3500)
+    return () => clearTimeout(t)
+  }, [wallMsg])
   const [mediaControl, setMediaControl]   = useState<MediaControl>(DEFAULT_MEDIA_CONTROL)
   const [mediaStatus, setMediaStatus]     = useState<MediaStatus>({ url: null, currentTime: 0, duration: 0, ended: false })
 
@@ -669,6 +679,23 @@ ${name}` }],
         onOpenSettings={() => setShowSettings(true)}
         onOpenRemote={() => setShowRemote(true)}
         remoteCount={remoteClients.operator + remoteClients.speaker}
+        wall={{
+          visible: appSettings.wall.matrix.control !== 'off',
+          on: wallOn,
+          busy: wallBusy,
+          onToggle: async () => {
+            const next = !wallOn
+            setWallBusy(true)
+            try {
+              const r = await switchWall(appSettings.wall.matrix, next)
+              // Manual: the operator presses the matrix buttons, so the reminder stays until dismissed
+              setWallMsg({ ok: r.ok, text: r.message, sticky: appSettings.wall.matrix.control === 'manual' || !r.ok })
+              if (r.ok) setWallOn(next)
+            } finally {
+              setWallBusy(false)
+            }
+          },
+        }}
       />
 
       <SecondScreenNotice enabled={appSettings.output.display1.enabled} />
@@ -767,6 +794,18 @@ ${name}` }],
           Ukuran tampilan {Math.round(ui.zoom * 100)}%{ui.mode === 'auto' ? ' (otomatis)' : ''}
           <span style={{ color: '#64748b' }}> · Ctrl + / − · Ctrl 0 = otomatis</span>
         </div>
+      )}
+
+      {wallMsg && (
+        <button onClick={() => setWallMsg(null)}
+          className="fixed top-16 right-4 max-w-md px-3 py-2 rounded-lg text-xs font-semibold text-left"
+          style={{
+            background: wallMsg.ok ? 'rgba(6,78,59,0.95)' : 'rgba(127,29,29,0.95)',
+            border: `1px solid ${wallMsg.ok ? '#059669' : '#dc2626'}`, color: '#f8fafc', zIndex: 100,
+          }}>
+          🧱 {wallMsg.text}
+          {wallMsg.sticky && <span className="block text-[10px] font-normal mt-0.5" style={{ color: '#cbd5e1' }}>Klik untuk menutup</span>}
+        </button>
       )}
 
       {showRemote && <RemoteModal clients={remoteClients} onClose={() => setShowRemote(false)} />}

@@ -21,3 +21,4 @@ dist-electron/
 data/media/
 .next-prod/
 release/
+release-archive/

@@ -18,6 +18,8 @@ const path = require('path')
 const root    = path.resolve(__dirname, '..')
 const distDir = path.join(root, '.next-prod')
 const release = path.join(root, 'release')
+// INSTALLER_SUFFIX=-wall → EasyChurch-Suite-Setup-0.1.0-wall.exe (test builds next to the released one)
+const suffix  = (process.env.INSTALLER_SUFFIX || '').replace(/[^\w.-]/g, '')
 const stage   = path.join(release, 'stage')
 const vendor  = path.join(root, 'vendor')
 const pkg     = require(path.join(root, 'package.json'))
@@ -142,11 +144,11 @@ const config = {
     uninstallerIcon: icon,
     installerHeaderIcon: icon,
     uninstallDisplayName: 'EasyChurch Suite',
-    artifactName: 'EasyChurch-Suite-Setup-${version}.${ext}',
+    artifactName: 'EasyChurch-Suite-Setup-${version}' + suffix + '.${ext}',
   },
 }
 const configPath = path.join(release, 'builder.json')
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
 run(process.execPath, [require.resolve('electron-builder/cli.js', { paths: [root] }), '--win', '--x64', '--config', configPath, '--projectDir', stage])
 
-console.log(`\n✔ ${path.join(release, `EasyChurch-Suite-Setup-${pkg.version}.exe`)}`)
+console.log(`\n✔ ${path.join(release, `EasyChurch-Suite-Setup-${pkg.version}${suffix}.exe`)}`)
